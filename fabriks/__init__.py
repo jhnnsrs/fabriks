@@ -147,6 +147,15 @@ from fabriks.simplifiers import (
     Simplifier,
     simplifier_for,
 )
+from fabriks.sizing import (
+    DEFAULT_CELL_BYTES,
+    DEFAULT_COARSENING,
+    DEFAULT_LAYER_SHRINK,
+    GridKwargs,
+    GridPlan,
+    LayerEstimate,
+    plan_grid,
+)
 from fabriks.sources import HasVerticesAndFaces, Mesh, MeshSource, coerce_mesh
 from fabriks.stores import (
     AsyncReadable,
@@ -170,6 +179,9 @@ __all__ = [
     "DECIMATION_EIGHTH",
     "DECIMATION_HALF",
     "DECIMATION_QUARTER",
+    "DEFAULT_CELL_BYTES",
+    "DEFAULT_COARSENING",
+    "DEFAULT_LAYER_SHRINK",
     "DEFAULT_ROW_GROUP_BYTES",
     "INDICES_UINT32",
     "MANIFEST_NAME",
@@ -197,7 +209,10 @@ __all__ = [
     "FormatError",
     "GreedyEdgeCollapse",
     "Grid",
+    "GridKwargs",
+    "GridPlan",
     "HasVerticesAndFaces",
+    "LayerEstimate",
     "Manifest",
     "MemoryStore",
     "Mesh",
@@ -235,6 +250,7 @@ __all__ = [
     "morton_encode_one",
     "open_collection",
     "plan_cells",
+    "plan_grid",
     "simplifier_for",
     "snap_boundary",
     "validate_columns",

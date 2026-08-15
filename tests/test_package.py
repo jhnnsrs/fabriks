@@ -13,7 +13,7 @@ import fabriks
 #: Submodules are importable and not part of the surface `__all__` describes.
 _SUBMODULES = {
     "build", "codecs", "errors", "frames", "geometry", "manifest", "octree",
-    "planner", "reader", "simplifiers", "sources", "stores", "writer",
+    "planner", "reader", "simplifiers", "sizing", "sources", "stores", "writer",
 }
 
 

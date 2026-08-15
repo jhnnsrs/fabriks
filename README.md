@@ -1,69 +1,50 @@
 # fabriks
 
-[![PyPI version](https://badge.fury.io/py/fabriks.svg)](https://pypi.org/project/fabriks/)
-[![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://pypi.org/project/fabriks/)
-![Maintainer](https://img.shields.io/badge/maintainer-jhnnsrs-blue)
-[![PyPI pyversions](https://img.shields.io/pypi/pyversions/fabriks.svg)](https://pypi.python.org/pypi/fabriks/)
-[![PyPI status](https://img.shields.io/pypi/status/fabriks.svg)](https://pypi.python.org/pypi/fabriks/)
+**A level-of-detail (LOD) wire format for 3D meshes.** `fabriks` partitions surface collections into an octree of Parquet files, allowing viewers to fetch only the required spatial detail per frame without running a dedicated server.
 
-**A level-of-detail wire format for meshes.** fabriks turns a pile of surfaces into an
-octree-partitioned, self-describing tree of Parquet files, so a viewer fetches the detail the
-view actually needs instead of the whole thing.
+It is strictly a *serializer*: zero network dependencies, client code, or storage opinions. Hand it an abstract store, and it writes the same layout to disk, S3, GCS, or memory.
 
-It is a *serializer*. It has no client, no network code and no opinion about where the bytes
-go: you hand it a store, and the same tree lands on a local disk or in an S3 prefix.
+---
 
-## Why
+**Key Properties**
 
-A segmentation of a large volume is tens of thousands of surfaces and hundreds of megabytes of
-triangles. A viewer that wants to draw it has two bad options — download everything, or ask a
-server to prepare something. fabriks takes the third: **partition once, at write time**, into a
-structure a dumb object store can serve and a renderer can plan against.
+* **Octree Partitioning**: Level 0 is full detail. Each coarser level combines 8 finer cells into 1 cell with a quarter of the face count.
+* **Dual Catalogs**: `catalog/cells.parquet` (spatial index read once at mount) and `catalog/objects.parquet` (inverted index mapping object IDs to cell keys).
+* **Seamless Boundaries**: Vertices on cell faces stay pinned during decimation—fine cells meet coarse neighbors without visual cracks.
+* **Range-Query Optimized**: Cells map to individual Parquet row groups sorted in Morton order for efficient byte-span fetches.
 
-- **An octree of cells.** Level 0 is full detail; each coarser level has one cell per eight
-  finer ones and a quarter of the faces. A renderer picks a level per cell, per frame.
-- **Two catalogs, answering opposite questions.** `cells.parquet` is the spatial index — read
-  once at mount, it decides which cells to fetch at which level without opening any geometry.
-  `objects.parquet` is the identity index, inverted — it answers *"where is segment 4711?"*
-  with a set of cell keys, making isolation and picking a lookup rather than a scan.
-- **No cracks between levels.** Vertices on cell faces are pinned, so a fine cell drawn next to
-  a coarse one meets it exactly. That property is what makes drawing a single object out of the
-  collection viable, and it is the writer's whole job.
+---
 
-## Install
+**Layout & Partitioning**
 
-```bash
-pip install fabriks              # everything needed to build and read collections
-pip install 'fabriks[obstore]'   # + obstore, to write to S3 and friends
-pip install 'fabriks[meshopt]'   # + the optional MESHOPT blob codec
+```text
+my-collection/
+  fabriks.json                  <- Root manifest (written last; atomic completion signal & checksums)
+  catalog/cells.parquet        <- Spatial index (maps level & cell_key to row group byte locators)
+  catalog/objects.parquet      <- Identity index (maps object IDs to cell keys for isolation/extraction)
+  level=0/part-00000.parquet   <- Level 0 full-detail geometry
+  level=1/part-00000.parquet   <- Decimated coarse-level geometry (L=1, L=2, ...)
+
 ```
 
-Everything that takes part in building a collection is a dependency rather than an extra:
-trimesh cuts a mesh at the cell planes and `fast-simplification` makes the coarse levels.
-scipy and shapely are named explicitly because trimesh does not require them and the clipper
-does — `slice_mesh_plane` imports `scipy.spatial.cKDTree` and `trimesh.path.polygons` (an
-unguarded `from shapely import ops`) in its body, verified by blocking each in turn.
+* **Spatial Octree**: Space is partitioned into uniform 3D cells (`cell_size`). Each parent cell at level `L >= 1` merges 8 child cells (2×2×2) from level `L - 1`.
+* **Seam Locking**: Vertices on cell boundary planes stay pinned during decimation so fine and coarse cells tile seamlessly without visual gaps.
+* **Morton Ordering**: Geometry row groups are sorted along a Z-order curve (Morton space) for spatially compact, range-query-friendly byte fetches.
 
-What is genuinely optional is what a *consumer* would otherwise need code for: reaching a
-remote store, and decoding a compressed blob.
+---
 
-fabriks ships a `py.typed` marker, so your type checker sees its annotations: vertices are
-`NDArray[np.float64]`, faces `NDArray[np.int64]`, and the three pluggable pieces — stores,
-codecs and simplifiers — are structural protocols you can satisfy without importing a base
-class. The package itself is checked with basedpyright in strict mode.
-
-## Examples
-
-Three runnable scripts in [`examples/`](examples/), in order — trimesh to the format, the
-format back to trimesh, and what the level-of-detail machinery actually buys:
+**Install**
 
 ```bash
-uv run python examples/01_trimesh_to_fabriks.py
-uv run python examples/02_fabriks_to_trimesh.py
-uv run python examples/03_level_of_detail.py
+pip install fabriks              # Core writer/reader (trimesh, fast-simplification, scipy, shapely)
+pip install 'fabriks[obstore]'   # + S3 / GCS / Azure support via obstore
+pip install 'fabriks[meshopt]'   # + MESHOPT blob decoding
+
 ```
 
-## Writing
+---
+
+**Sizing & Writing**
 
 ```python
 import trimesh
@@ -75,280 +56,77 @@ objects = {
     3: trimesh.creation.box(extents=[40, 24, 16]).apply_translation([90, 70, 40]),
 }
 
+# Derive grid dimensions from byte targets (optional)
+grid_plan = fabriks.plan_grid(objects, cell_bytes=16 * 1024, layer_bytes=128 * 1024)
+
+# Write meshes directly to a store
 manifest = fabriks.write_meshes(
     objects,
-    LocalStore("/data"),          # or S3Store(...), or fabriks.DirectoryStore("/data")
+    store=LocalStore("/data"),
     prefix="my-collection",
-    cell_size=(128, 128, 64),     # in voxels, in the same component order as the vertices
-    levels=3,
+    **grid_plan.as_kwargs(),
 )
+
 ```
 
-Objects are keyed by the id they carry in whatever they were extracted from — a label volume's
-instance ids, say — and those ids are written through unchanged. Each value is a
-`trimesh.Trimesh`, a `fabriks.Mesh`, or a plain `(vertices, faces)` pair of arrays.
+---
 
-To inspect or check the frames before spending the writes, build and write in two steps:
+**Reading & Planning**
 
 ```python
-collection = fabriks.build_collection(objects, cell_size=(128, 128, 64))
-collection.cell_catalog      # pyarrow.Table -- the spatial index
-collection.object_catalog    # pyarrow.Table -- the identity index
-collection.shards            # [(level, pyarrow.Table)]
-collection.write(store, "my-collection")
-```
+import fabriks
+from obstore.store import LocalStore
 
-## The tree it writes
-
-```
-my-collection/
-  fabriks.json                  <- the manifest, written LAST
-  catalog/cells.parquet        <- one row per (level, cell)
-  catalog/objects.parquet      <- one row per object
-  level=0/part-00000.parquet   <- the geometry, finest level
-  level=1/part-00000.parquet
-  level=2/part-00000.parquet
-```
-
-**The manifest lands last, and that is the completion protocol.** A prefix has no atomic
-"upload finished" flag: a `PutObject` either happened or it did not, but a tree is a sequence
-of writes that can stop anywhere. So every file the manifest names is written before the
-manifest is, and a prefix without one is an *interrupted write* rather than a collection —
-which turns "this thing is half written" from something a renderer discovers into something
-opening it rejects.
-
-**The geometry lands before the catalog that points into it.** Each level part is written with
-one Parquet row group per byte-budgeted run of cells, and the cell catalog records, per cell,
-the part and row group holding it — facts about bytes that do not exist until the bytes do. The
-manifest then records each file's length, because that is the one thing a reader cannot
-discover: fabriks asks a store for `put`/`get`/`list` and nothing more, and a Parquet footer
-lives at the end of a file you have to be able to seek to.
-
-## Reading and planning
-
-```python
 collection = fabriks.open_collection(LocalStore("/data"), "my-collection")
 
-collection.grid.cell_size      # (128, 128, 64)
-collection.encoding.codec      # 'NONE'
-collection.cells               # the whole spatial index, {(level, cell): CellEntry}
-
-# Which cells, at which level, for this view? Answered from the catalog alone.
+# Camera or voxel error budget planning
 camera = fabriks.Camera.perspective((0, 0, 500), fov_y=0.8, viewport_height=1080)
 plan = collection.plan(camera=camera, pixel_budget=1.0)
 
-# Each cell costs the row group holding it, not the level it came from. `read_cells` goes
-# further: it reads a row group once however many of the planned cells share it.
-for cell in collection.read_cells([(entry.level, entry.cell) for entry in plan]):
+# Synchronous batch fetch
+for cell in collection.read_cells([(e.level, e.cell) for e in plan]):
     draw(cell.vertices, cell.faces)
 
-collection.release()           # drop the cached levels; the catalogs stay
-
-# Or spend the budget in voxels, with no camera at all.
-collection.plan(error_budget=0.5)
-
-# One object, reassembled across every cell that holds a piece of it.
+# Reassemble single object across cells
 mesh = collection.object_mesh(7)
+collection.release()
 
-# One object out of a shared cell, with its indices re-based.
-piece = collection.read_cell(0, 3).object_mesh(7)
 ```
 
-The planner descends from the coarsest level, keeps a cell when its LOD error fits the budget,
-and otherwise descends into the children `child_mask` names — so descending costs no listing
-and no second query. It also takes a query `box`, `frustum` planes, an `objects` filter
-resolved through the object catalog, and a `max_cells` cap that **degrades detail rather than
-dropping geometry**: running out of budget gives you a coarser cell, never a hole. Every
-`CellEntry` also carries `blob_bytes`, so a plan can be budgeted in bytes before a single fetch.
-
-## Reading without blocking
-
-A frame is forty cells, and forty sequential round trips to an object store is not a frame:
+**Async Reading**
 
 ```python
 collection = await fabriks.aopen_collection(S3Store(...), "my-collection")
 plan = collection.plan(camera=camera)
 cells = await collection.aread_cells([(e.level, e.cell) for e in plan], concurrency=16)
+
 ```
 
-The work arrives in two waves, because the second cannot be known without the first: the
-footers of every part the plan touches, then the byte span of every row group it needs — each
-wave issued at once. Only then is anything parsed, and the decode goes to a worker thread.
+---
 
-pyarrow's reader is synchronous and fabriks does not pretend otherwise; what is asynchronous is
-the part that is actually I/O. A store carrying `get_async` / `get_range_async` (obstore does)
-has them used directly; one without them has its sync methods run in a thread, which for a
-network round trip overlaps just as well.
+**Configuration**
 
-## Stores
+| Protocol | Options | Notes |
+| --- | --- | --- |
+| **Stores** | `LocalStore`, `S3Store`, `DirectoryStore`, `MemoryStore` | Implements `put`, `get`, `list`, and optional `get_range`. |
+| **Simplifiers** | `"QUADRIC"` (default), `"GREEDY"` | `QUADRIC` uses `fast-simplification` with `preserve_border=True`. Custom simplifiers implement `fabriks.Simplifier`. |
+| **Codecs** | `codec`: `NONE`, `MESHOPT`<br>
 
-fabriks asks a store for three methods — `put(path, data)`, `get(path)`, `list(prefix)` — and
-uses a fourth if it is there: `get_range(path, start=..., length=...)`. That is deliberately the
-shape [obstore][obstore] already has, so its `S3Store`, `LocalStore`, `GCSStore`, `AzureStore`
-and `MemoryStore` all work **as they are**, with no adapter and without obstore being a
-dependency of fabriks.
+<br>`compression`: `NONE`, `ZSTD` | Default is `NONE`/`NONE` (raw little-endian arrays for zero-copy GPU upload). |
 
-`get_range` is the optional one because it is what a hand-rolled store is likeliest to be
-missing, and its absence has to degrade rather than fail: without it, reading a cell falls back
-to fetching its whole level part and slicing — correct, and exactly what fabriks did before the
-locator existed. With it, a cell costs its row group.
+---
 
-For a plain path and no dependencies, `fabriks.DirectoryStore("/data")` does the same job;
-`fabriks.MemoryStore()` is there for tests. Both implement `get_range`.
-
-## Simplification
-
-Each coarser level is the same surfaces with fewer triangles, and which algorithm does that
-reduction is named the way a codec is — a value out of a small vocabulary:
+**Verification**
 
 ```python
-fabriks.build_collection(objects, cell_size=(128, 128, 64))                  # QUADRIC, the default
-fabriks.build_collection(objects, cell_size=..., simplifier="GREEDY")
-fabriks.build_collection(objects, cell_size=..., simplifier=fabriks.GreedyEdgeCollapse())  # configured
-fabriks.build_collection(objects, cell_size=..., decimation=fabriks.Decimation.half())
-```
-
-| Backend | What it is |
-| --- | --- |
-| `"QUADRIC"` (`QuadricSimplifier`) | **The default**, backed by [fast-simplification][fs]. Quadric edge collapse run with `preserve_border=True`, which pins every vertex on the cut curve at *exactly* its input position while letting interior vertices move to the shape-optimal spot. That split is what the format wants: the cut curve is the only thing a neighbour shares, so it is the only thing that must not move. |
-| `"GREEDY"` (`GreedyEdgeCollapse`) | Shortest-edge collapse in pure numpy. Lower quality and a much looser error estimate, but it pins only *this* level's cell planes, so it reduces harder on heavily cut objects. |
-
-The trade is real and worth knowing before you pick. `preserve_border` is all-or-nothing: after
-a coarse cell welds its children, the topological boundary still contains the level-0 seams
-*interior* to that cell, and those get pinned too even though nothing across a face depends on
-them. On a heavily cut object that can be most of the boundary, and the collapse then falls
-short of its budget — measured on one box cut into 34 fragments, the quadric backend stopped at
-74% where the greedy collapse reached 9%. fabriks warns when a level misses its budget and names
-which cause the numbers support.
-
-[fs]: https://github.com/pyvista/fast-simplification
-
-`Decimation` controls how much survives each level — `quarter()` (the default), `half()`,
-`eighth()`, or `custom(ratio)` — plus `floor_faces`, the smallest budget any one object's piece
-is given. The ratio and the name written into `encoding.decimation` are **required to agree**:
-declaring `QUARTER` while reducing by half would be a claim about the geometry that nothing
-downstream could test.
-
-Bring your own by implementing one method — `fabriks.Simplifier` is a structural protocol, so
-there is nothing to inherit:
-
-```python
-class MySimplifier:
-    name = "mine"
-    uses_fixed_mask = True
-    def simplify(self, vertices, faces, *, fixed, target_faces) -> fabriks.Simplified: ...
-```
-
-## Checking one
-
-Two of the declarations above are kept by the writer or not at all, and no renderer can see
-whether they were — it only ever looks at one cell. Given the whole collection they are
-perfectly checkable, so fabriks ships the thing that checks:
-
-```python
-report = fabriks.verify(collection, tier="geometry")
+report = fabriks.verify(collection, tier="geometry")  # "structure" | "blobs" | "geometry"
 if not report:
-    print(report)          # every failed check, with examples
+    print(report)
+
 ```
 
-Three tiers, because they cost very different amounts:
+---
 
-| tier | reads | answers |
-| --- | --- | --- |
-| `structure` | the manifest and two catalogs | do the files exist, are the recorded lengths right, does `child_mask` name the children that exist, do the locators point inside real row groups, do the two catalogs agree |
-| `blobs` | every cell | does every blob decode to the counts its row claims, do indices stay inside their vertex array, is every vertex inside its own cell box |
-| `geometry` | every level, compared | `boundary: LOCKED` — are on-plane vertices held fixed across levels; `decimation` — is a coarse level actually smaller; is `lod_error` a real bound on deviation from the level-0 surface |
+**Coordinates & Conventions**
 
-`structure` reads two small files and no geometry, which makes it cheap enough to run at
-registration time — the point in a pipeline where rejecting a bad collection is free.
-
-Nothing raises. A verifier that stops at the first problem tells you about one thing when you
-wanted all of them, so every check runs and the report carries the lot.
-
-## Blob encoding
-
-Two independent knobs, and **both default to `NONE`** — a blob is then the raw little-endian
-layout the format describes, which a consumer reads out of the Parquet column and uploads to
-the GPU with nothing in between:
-
-```python
-fabriks.build_collection(objects, cell_size=...)                              # NONE / NONE
-fabriks.build_collection(objects, cell_size=..., compression="ZSTD")          # smaller on disk
-fabriks.build_collection(objects, cell_size=..., codec="MESHOPT")             # needs [meshopt]
-```
-
-| | what it is | measured on the demo scene |
-| --- | --- | --- |
-| `codec: NONE` | positions are 6 bytes a vertex, indices 4 bytes an index | 366 KB |
-| `compression: ZSTD` | each blob is a zstd frame; its length comes from the row's vertex/index count, since the framing carries none | 355 KB |
-| `codec: MESHOPT` | glTF's `EXT_meshopt_compression`, needing a decoder on the reading side | 237 KB |
-
-The honest summary: ZSTD buys ~3% because the Parquet file is already zstd-compressed around
-the blobs, so it is mostly redundant. MESHOPT buys 35% and costs the consumer a decoder.
-`NONE`/`NONE` costs nothing and needs nothing, which is why it is the default.
-
-`codec: MESHOPT` with `compression: ZSTD` is refused rather than merely discouraged: the ZSTD
-framing derives a blob's uncompressed length from the row's counts, and a meshopt blob has no
-fixed size per element, so the pair is undecodable.
-
-## Coordinates
-
-**fabriks addresses components by position, never by name.** Vertices, `cell_size` and the
-`bbox_*` columns are component 0, 1 and 2 — and nothing in the writer, the octree or the
-planner asks what those components mean. Feed them in whatever order your data already has,
-as long as you feed them *consistently*, and you get the same octree either way.
-
-That matters because meshes usually come out of marching cubes over a `(z, y, x)` array, and
-the imaging stack around them is `(z, y, x)` throughout. There is no house convention to
-transpose into first:
-
-```python
-# vertices from a (z, y, x) volume, and the chunk shape of that same volume
-fabriks.write_meshes(objects, store, prefix=key, cell_size=(64, 128, 128))
-```
-
-The `x`/`y`/`z` in the `bbox_min_x` / `bbox_max_z` column names are **labels for slots 0, 1
-and 2**, fixed by the Parquet schema a server checks with a `DESCRIBE`. They are not a claim
-about which physical axis each slot holds, and the manifest makes no such claim either: naming
-these axes says how the collection relates to the image it came from or the coordinate graph it
-sits in, which is knowledge the layer that owns that coordinate system has and fabriks does not.
-A field here would be a claim nothing in the format could check, use or contradict.
-
-Two consequences worth knowing:
-
-- **An order mistake here cannot misplace geometry.** Clipping and quantization read the same
-  `cell_size`, so a mismatched one gives you a differently *shaped* octree — cells that fit
-  the data's anisotropy less well, so the tree narrows a fetch less — while every vertex still
-  decodes exactly where it started. The failure mode is efficiency, not correctness.
-- **`cell_size` is still worth matching to your source array's chunk shape.** In whatever
-  order that shape is in. A cell that matches the chunking means a viewer fetching image
-  chunks and mesh cells pulls the same regions, and nothing about the meshes themselves can
-  reveal it.
-
-## What the format promises, and what it does not
-
-Two declarations are true by construction and unverifiable by anything downstream, so they are
-kept by the writer or not at all:
-
-- **`boundary: LOCKED`** — every object is cut *once*, at the level-0 planes; coarser levels
-  are assembled by welding children and decimated with on-plane vertices held fixed. See
-  `fabriks/geometry.py` for the argument, including the residual case that follows from 65535
-  being odd.
-- **`decimation: QUARTER`** — level `L` targets `(1/4)**L` of the level-0 face count. When a
-  collection cannot reach it — usually a cell size small relative to the objects, so every cut
-  vertex is pinned — fabriks warns and says which cause the numbers support.
-
-- **`sortKey: MORTON`** — rows within a level are written in ascending Morton order. That is
-  what makes a row group a spatially compact set of cells rather than an arbitrary one, and so
-  what makes a row group the right unit for a reader to fetch.
-
-What it does *not* do: it holds every object in memory and builds one shard per level, so it is
-sized for thousands of objects rather than millions; and `lod_error` is an upper bound rather
-than a measured Hausdorff distance.
-
-The byte format is documented in `fabriks/codecs/`, how space is divided in `fabriks/octree.py`,
-and the tree layout in `fabriks/manifest.py`. The three pluggable pieces are packages with the
-same shape — a protocol module and one module per implementation: `fabriks/stores/`,
-`fabriks/codecs/` and `fabriks/simplifiers/`.
-
-[obstore]: https://developmentseed.org/obstore/
+`fabriks` addresses dimensions strictly by array slot `(0, 1, 2)`. Inputs from `(z, y, x)` volumes pass directly via `cell_size=(z_size, y_size, x_size)` without transposition. Axis labels in column names are slot identifiers, not physical coordinate claims.
