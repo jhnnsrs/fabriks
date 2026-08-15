@@ -1,0 +1,244 @@
+"""fabriks: a level-of-detail mesh wire format.
+
+A mesh collection is an **octree of surfaces** written as one self-describing tree, so a
+renderer can fetch the detail it needs for the view it has instead of the whole thing::
+
+    <prefix>/
+      fabriks.json                    <- the manifest, written LAST
+      catalog/cells.parquet          <- the spatial index, one row per (level, cell)
+      catalog/objects.parquet        <- the identity index, one row per object
+      level=0/part-00000.parquet     <- the geometry, finest level
+      level=1/part-00000.parquet
+      level=2/part-00000.parquet
+
+Writing one::
+
+    import trimesh
+    from obstore.store import LocalStore
+    import fabriks
+
+    objects = {1: trimesh.creation.icosphere(radius=4.0), 2: ...}
+    manifest = fabriks.write_meshes(
+        objects,
+        LocalStore("/data"),          # or an S3Store, or fabriks.DirectoryStore
+        prefix="my-collection",
+        cell_size=(128, 128, 64),     # in voxels, in your data's own component order
+    )
+
+Reading it back::
+
+    collection = fabriks.open_collection(LocalStore("/data"), "my-collection")
+    for entry in collection.plan(camera=fabriks.Camera.perspective((0, 0, 500), fov_y=0.8, viewport_height=1080)):
+        cell = collection.read_cell(entry.level, entry.cell)
+        draw(cell.vertices, cell.faces)
+
+    sphere = collection.object_mesh(1)   # one object, reassembled across its cells
+
+Coordinates
+-----------
+**fabriks addresses components by position, never by name.** Vertices, ``cell_size`` and the
+``bbox_*`` columns are components 0, 1 and 2, and nothing in the writer, the octree or the
+planner asks what they mean. Feed them in whatever order your data already has -- meshes off a
+``(z, y, x)`` volume stay ``(z, y, x)`` -- as long as you feed them *consistently*, and the
+octree comes out the same either way.
+
+The ``x``/``y``/``z`` in the ``bbox_min_x`` column names are labels for those three slots,
+fixed by the Parquet schema a server checks. They are not a claim about which physical axis
+each slot holds, and the format makes no such claim anywhere: naming these axes is a statement
+about how the collection relates to the image it came from or the coordinate graph it sits in,
+which belongs to whatever owns that coordinate system rather than to `fabriks.json`.
+
+An order mistake here cannot misplace geometry: clipping and quantization read the same
+``cell_size``, so a mismatched one yields a differently *shaped* octree rather than displaced
+vertices. Still worth matching ``cell_size`` to the source array's chunk shape, in whatever
+order that shape is in -- a cell that matches the chunking means a viewer fetching image chunks
+and mesh cells pulls the same regions.
+
+Simplification
+--------------
+A coarse level is made by a pluggable backend, named the way a codec is: ``"QUADRIC"`` is the
+default, backed by ``fast-simplification`` -- it collapses to the quadric-optimal shape while
+pinning every vertex on the cut boundary at exactly its input position, which is what makes
+``boundary: LOCKED`` provable rather than intended. ``"GREEDY"`` is a pure-numpy alternative,
+useful where a heavily pinned boundary stops the quadric collapse reaching a budget::
+
+    fabriks.build_collection(objects, cell_size=..., simplifier="GREEDY")
+    fabriks.build_collection(objects, cell_size=..., simplifier=fabriks.GreedyEdgeCollapse())
+    fabriks.build_collection(objects, cell_size=..., decimation=fabriks.Decimation.half())
+
+Pass the name to pick a backend, an instance to configure one, or your own object providing
+``simplify`` -- see :mod:`fabriks.simplifiers`.
+
+How much survives each level is :class:`Decimation`, defaulting to a quarter. Whatever it is,
+the manifest declares what was actually done: a ratio and its declaration are required to
+agree, because nothing downstream can re-derive one from the other.
+
+The byte format is documented in :mod:`fabriks.codecs`; the boundary and decimation arguments in
+:mod:`fabriks.geometry`; the tree layout in :mod:`fabriks.manifest`.
+"""
+
+from fabriks.build import MeshCollection, build_collection, choose_cell_size
+from fabriks.codecs import (
+    QUANT_MAX,
+    BlobCodec,
+    MeshoptCodec,
+    RawCodec,
+    codec_for,
+    decode_indices,
+    decode_positions,
+    encode_indices,
+    encode_positions,
+)
+from fabriks.errors import (
+    FabriksError,
+    FormatError,
+    MissingExtraError,
+    PartitioningError,
+    UnfinishedCollectionError,
+)
+from fabriks.frames import (
+    DEFAULT_ROW_GROUP_BYTES,
+    REQUIRED_COLUMNS,
+    arrow_schemas,
+    validate_columns,
+)
+from fabriks.geometry import decimate_fixed, snap_boundary
+from fabriks.manifest import (
+    BOUNDARY_LOCKED,
+    CELL_CATALOG_PATH,
+    CODEC_MESHOPT,
+    CODEC_NONE,
+    COMPRESSION_NONE,
+    COMPRESSION_ZSTD,
+    DECIMATION_CUSTOM,
+    DECIMATION_EIGHTH,
+    DECIMATION_HALF,
+    DECIMATION_QUARTER,
+    INDICES_UINT32,
+    MANIFEST_NAME,
+    OBJECT_CATALOG_PATH,
+    POSITIONS_UINT16_QUANTIZED_PER_CELL,
+    SPEC_VERSION,
+    Decimation,
+    Encoding,
+    FileEntry,
+    Grid,
+    Manifest,
+    level_part_path,
+    level_prefix,
+)
+from fabriks.octree import cell_box, morton_decode, morton_encode, morton_encode_one
+from fabriks.planner import Camera, plan_cells
+from fabriks.reader import (
+    CellEntry,
+    Collection,
+    DecodedCell,
+    ObjectEntry,
+    aopen_collection,
+    open_collection,
+)
+from fabriks.simplifiers import (
+    SIMPLIFICATION_DEFAULT,
+    SIMPLIFICATION_GREEDY,
+    SIMPLIFICATION_QUADRIC,
+    GreedyEdgeCollapse,
+    QuadricSimplifier,
+    Simplified,
+    Simplifier,
+    simplifier_for,
+)
+from fabriks.sources import HasVerticesAndFaces, Mesh, MeshSource, coerce_mesh
+from fabriks.stores import (
+    AsyncReadable,
+    DirectoryStore,
+    FabriksStore,
+    MemoryStore,
+    RangeReadable,
+    StoreFile,
+)
+from fabriks.verify import Check, VerifyReport, verify
+from fabriks.writer import awrite_collection, write_collection, write_meshes
+
+__all__ = [
+    "BOUNDARY_LOCKED",
+    "CELL_CATALOG_PATH",
+    "CODEC_MESHOPT",
+    "CODEC_NONE",
+    "COMPRESSION_NONE",
+    "COMPRESSION_ZSTD",
+    "DECIMATION_CUSTOM",
+    "DECIMATION_EIGHTH",
+    "DECIMATION_HALF",
+    "DECIMATION_QUARTER",
+    "DEFAULT_ROW_GROUP_BYTES",
+    "INDICES_UINT32",
+    "MANIFEST_NAME",
+    "OBJECT_CATALOG_PATH",
+    "POSITIONS_UINT16_QUANTIZED_PER_CELL",
+    "QUANT_MAX",
+    "REQUIRED_COLUMNS",
+    "SIMPLIFICATION_DEFAULT",
+    "SIMPLIFICATION_GREEDY",
+    "SIMPLIFICATION_QUADRIC",
+    "SPEC_VERSION",
+    "AsyncReadable",
+    "BlobCodec",
+    "Camera",
+    "CellEntry",
+    "Check",
+    "Collection",
+    "Decimation",
+    "DecodedCell",
+    "DirectoryStore",
+    "Encoding",
+    "FabriksError",
+    "FabriksStore",
+    "FileEntry",
+    "FormatError",
+    "GreedyEdgeCollapse",
+    "Grid",
+    "HasVerticesAndFaces",
+    "Manifest",
+    "MemoryStore",
+    "Mesh",
+    "MeshCollection",
+    "MeshSource",
+    "MeshoptCodec",
+    "MissingExtraError",
+    "ObjectEntry",
+    "PartitioningError",
+    "QuadricSimplifier",
+    "RangeReadable",
+    "RawCodec",
+    "Simplified",
+    "Simplifier",
+    "StoreFile",
+    "UnfinishedCollectionError",
+    "VerifyReport",
+    "aopen_collection",
+    "arrow_schemas",
+    "awrite_collection",
+    "build_collection",
+    "cell_box",
+    "choose_cell_size",
+    "codec_for",
+    "coerce_mesh",
+    "decimate_fixed",
+    "decode_indices",
+    "decode_positions",
+    "encode_indices",
+    "encode_positions",
+    "level_part_path",
+    "level_prefix",
+    "morton_decode",
+    "morton_encode",
+    "morton_encode_one",
+    "open_collection",
+    "plan_cells",
+    "simplifier_for",
+    "snap_boundary",
+    "validate_columns",
+    "verify",
+    "write_collection",
+    "write_meshes",
+]

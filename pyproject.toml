@@ -1,0 +1,169 @@
+[project]
+name = "fabriks"
+version = "1.1.1"
+description = "a level-of-detail mesh wire format: octree-partitioned surfaces written to any object store"
+authors = [{ name = "jhnnsrs", email = "jhnnsrs@gmail.com" }]
+requires-python = ">=3.11"
+readme = "README.md"
+license = "MIT"
+# fabriks builds mesh collections, so everything that takes part in building one is a
+# dependency rather than an extra. `trimesh` cuts a mesh at the cell planes and
+# `fast-simplification` makes the coarse levels; only reaching a remote store is optional.
+#
+# scipy and shapely are named because trimesh does not require them and the clipper does.
+# trimesh hard-depends on numpy alone -- both of these sit in its `easy` extra -- while
+# `slice_mesh_plane` imports `scipy.spatial.cKDTree` and `trimesh.path.polygons` (an unguarded
+# `from shapely import ops`) in its function body. Verified by blocking each import in turn:
+# cutting a single box fails without either, at `cap=False` as well as `cap=True`.
+dependencies = [
+    "numpy>=1.26",
+    "pyarrow>=12",
+    "trimesh>=4.0",
+    "scipy>=1.11",
+    "shapely>=2.0",
+    "fast-simplification>=0.1.7",
+]
+
+[project.optional-dependencies]
+# `codec: MESHOPT` -- the codec glTF's EXT_meshopt_compression uses. Optional because the
+# format's default is `NONE`, where a blob is the raw layout a consumer uploads as-is; reach
+# for this when the payload matters more than the absence of a decoder on the other side.
+meshopt = ["meshoptimizer>=0.2"]
+# Writing to S3 (or anywhere else obstore reaches). fabriks only needs three methods off a
+# store, so this is for callers who want one rather than a directory.
+obstore = ["obstore>=0.10"]
+complete = ["meshoptimizer>=0.2", "obstore>=0.10"]
+# Installed inside the semantic-release Docker action so build_command has uv.
+build = ["uv>=0.7.12"]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.3.5",
+    "pytest-cov>=6.1.1",
+    "python-semantic-release>=9.21.0",
+    "ruff>0.11",
+    "basedpyright>=1.21",
+    "obstore>=0.10",
+    # pyarrow ships no type information of its own, so these stubs are what holds the frames,
+    # the reader and the writer to the full strict rule set rather than to `Unknown`. They
+    # describe a newer pyarrow than the `>=12` floor above, which is deliberate and safe here:
+    # fabriks only calls `table`/`field`/`schema`, the two Parquet writers, `ParquetFile` and
+    # the buffer types, all of which predate 12 and have not changed shape since.
+    "pyarrow-stubs>=20.0.0.20260625",
+]
+
+[tool.hatch.build.targets.sdist]
+include = ["fabriks"]
+
+[tool.hatch.build.targets.wheel]
+include = ["fabriks"]
+
+[tool.basedpyright]
+include = ["fabriks"]
+exclude = ["**/__pycache__", "tests"]
+typeCheckingMode = "strict"
+# trimesh, fast-simplification and scipy ship no type information, so every value that comes
+# back through them is Unknown no matter what fabriks annotates. These four rules would then
+# report the *dependency's* silence at each of fabriks's call sites, which casts could only
+# paper over -- so they are off, and every other strict rule stays on. pyarrow is typed here
+# through `pyarrow-stubs`, which is why the frames, reader and writer are held to the full set.
+reportUnknownMemberType = false
+reportUnknownArgumentType = false
+reportUnknownVariableType = false
+reportUnknownParameterType = false
+reportMissingTypeStubs = false
+
+[tool.ruff.lint]
+extend-select = ["ANN", "D1"]
+
+[tool.ruff.lint.per-file-ignores]
+# A test's name and docstring say what it asserts; a `-> None` on every one of them is noise
+# that makes the suite harder to read, which is the opposite of what the rule is for.
+"tests/*" = ["ANN001", "ANN201", "ANN202", "ANN206"]
+
+[tool.ruff]
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+]
+
+# Same as Black.
+line-length = 100
+
+[tool.pytest.ini_options]
+markers = [
+    "meshopt: marks tests that require the meshopt extra",
+    "obstore: marks tests that require the obstore extra",
+]
+
+[[tool.pydoc-markdown.loaders]]
+type = "python"
+search_path = ["fabriks"]
+
+[tool.pydoc-markdown.renderer]
+type = "docusaurus"
+docs_base_path = "website/docs"
+
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+# The semantic-release GitHub Action runs in a Docker container without uv, so
+# install it first (the `build` extra). After PSR bumps the version in
+# pyproject.toml, re-sync just this package's entry in uv.lock and stage it so
+# the release commit carries a consistent lock. $PACKAGE_NAME is injected by PSR.
+build_command = """
+    python -m pip install -e '.[build]'
+    uv lock --upgrade-package "$PACKAGE_NAME"
+    git add uv.lock
+    uv build
+"""
+commit_message = "chore(release): v{version} [skip ci]"
+
+# main -> stable X.Y.Z. next -> prereleases X.Y.Z-rc.N. N.x -> maintenance.
+[tool.semantic_release.branches.main]
+match = "main"
+prerelease = false
+
+[tool.semantic_release.branches.next]
+match = "next"
+prerelease = true
+prerelease_token = "rc"
+
+# Maintenance branches (1.x, 2.x, ...) cut stable patch/minor releases for an
+# older major after a new major has shipped from main.
+[tool.semantic_release.branches.maintenance]
+match = '^\d+\.x$'
+prerelease = false
+
+# Keep the changelog focused on user-facing changes. These patterns only filter
+# what's rendered -- they do not affect version bumps.
+[tool.semantic_release.changelog]
+exclude_commit_patterns = [
+    '^chore(?:\([^)]*\))?: ',
+    '^ci(?:\([^)]*\))?: ',
+    '^build(?:\([^)]*\))?: ',
+    '^style(?:\([^)]*\))?: ',
+    '^test(?:\([^)]*\))?: ',
+    '^Merge ',
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
