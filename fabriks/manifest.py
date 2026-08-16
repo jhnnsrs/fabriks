@@ -64,8 +64,8 @@ from fabriks.errors import FormatError
 #: The counter went 1..4 while the format was still being cut, before anything else read a
 #: manifest fabriks wrote; those numbers named drafts rather than versions anyone can hold, so
 #: the first one that means something is 1. This is the number a server checks against -- see
-#: ``SUPPORTED_VERSIONS`` in mikro's ``datalayer/maille.py`` (still under the old name there,
-#: renaming alongside this package), kept in step by the contract rather than by an import.
+#: ``SUPPORTED_VERSIONS`` in mikro's ``datalayer/fabriks.py``, kept in step by the contract
+#: rather than by an import.
 SPEC_VERSION = "1"
 
 #: The manifest's name, at the root of the collection's prefix.
