@@ -58,9 +58,9 @@ def test_the_same_tree_lands_in_every_kind_of_store(collection: fabriks.MeshColl
         "collection/catalog/cells.parquet",
         "collection/catalog/objects.parquet",
         "collection/fabriks.json",
-        "collection/level=0/part-00000.parquet",
-        "collection/level=1/part-00000.parquet",
-        "collection/level=2/part-00000.parquet",
+        "collection/level0/part-00000.parquet",
+        "collection/level1/part-00000.parquet",
+        "collection/level2/part-00000.parquet",
     ]
 
     opened = fabriks.open_collection(store, "collection")  # type: ignore[arg-type]
@@ -74,7 +74,7 @@ def test_a_directory_store_writes_the_tree_a_shell_can_see(collection: fabriks.M
 
     assert (tmp_path / "c" / "fabriks.json").is_file()
     assert (tmp_path / "c" / "catalog" / "cells.parquet").is_file()
-    assert (tmp_path / "c" / "level=1" / "part-00000.parquet").is_file()
+    assert (tmp_path / "c" / "level1" / "part-00000.parquet").is_file()
 
 
 def test_writing_at_an_empty_prefix_does_not_produce_a_leading_slash():
@@ -93,7 +93,7 @@ def test_a_collection_may_not_name_a_file_outside_its_own_tree():
         store.put("/etc/passwd", b"x")
     with pytest.raises(fabriks.FormatError, match="escape it"):
         store.put("a/../../b", b"x")
-    assert validate_relative("level=0/part-00000.parquet")
+    assert validate_relative("level0/part-00000.parquet")
 
 
 def test_get_bytes_accepts_both_flavours_of_result():

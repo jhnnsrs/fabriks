@@ -101,7 +101,7 @@ class AccountingStore(fabriks.MemoryStore):
         finally:
             self._depth -= 1
 
-    def bytes_read(self, containing: str = "level=") -> int:
+    def bytes_read(self, containing: str = "/level") -> int:
         """How many bytes the recorded reads moved, for paths matching ``containing``."""
         return sum(size for path, size in self.reads if containing in path)
 

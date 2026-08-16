@@ -8,9 +8,18 @@ travels next to the geometry, in ``fabriks.json`` at the root of the prefix::
       fabriks.json                    <- the manifest, written LAST
       catalog/cells.parquet          <- the spatial index, one row per (level, cell)
       catalog/objects.parquet        <- the identity index, one row per object
-      level=0/part-00000.parquet     <- the geometry, finest level
-      level=1/part-00000.parquet
-      level=2/part-00000.parquet
+      level0/part-00000.parquet      <- the geometry, finest level
+      level1/part-00000.parquet
+      level2/part-00000.parquet
+
+**Every name in that tree is spelled to be signable.** A path component ends up inside a signed
+URL, and SigV4 canonicalises a request by percent-encoding the path against RFC 3986's
+*unreserved* set before signing it. A name outside that set is a name two implementations encode
+differently -- an SDK, a proxy, a CDN and a hand-rolled presigner disagree on whether ``=``
+becomes ``%3D``, and on whether to encode twice -- and the symptom is ``SignatureDoesNotMatch``
+on a key the store itself is perfectly happy with. So the format's names use letters, digits,
+``-`` and ``.`` and nothing else. Not even ``~``, which RFC 3986 calls unreserved and older
+signers percent-encode anyway.
 
 **The manifest is the completion marker.** A prefix has no atomic "upload finished" flag -- a
 ``PutObject`` either happened or it did not, but a tree is a sequence of writes that can stop
@@ -69,10 +78,20 @@ OBJECT_CATALOG_PATH = "catalog/objects.parquet"
 #: A dense ordinal is 24 bits in the format, so a collection holds at most this many objects.
 MAX_ORDINAL = 1 << 24
 
+#: An octree of surfaces is three-dimensional, so `shape` and `axes` are three long. The rank is
+#: fixed by the Morton key and the `bbox_*_{x,y,z}` columns, not a parameter.
+_SHAPE_RANK = 3
+
 
 def level_prefix(level: int) -> str:
-    """The directory holding one octree level's geometry."""
-    return f"level={int(level)}"
+    """The directory holding one octree level's geometry.
+
+    ``level0`` rather than the Hive-style ``level=0`` this once was: ``=`` is a sub-delimiter
+    rather than an unreserved character, so a SigV4 canonical request carries it as ``%3D``
+    while a signer that treats a path as opaque leaves it bare -- two different strings to sign
+    for one object, and a ``SignatureDoesNotMatch`` that looks like a credentials problem.
+    """
+    return f"level{int(level)}"
 
 
 def level_part_path(level: int, part: int = 0) -> str:
@@ -383,6 +402,43 @@ class Encoding:
         return cls(**{key: str(raw[key]) for key in _REQUIRED_ENCODING_KEYS})
 
 
+def _read_shape(raw: Any) -> tuple[int, int, int] | None:  # noqa: ANN401
+    """Read a manifest's ``shape``, refusing one that does not describe a three-dimensional space.
+
+    ``None`` is a legitimate answer and stays ``None``: a writer that cannot state an
+    origin-anchored size says so, and a reader that is handed nothing knows it was not told
+    rather than being handed a box that excludes geometry.
+    """
+    if raw is None:
+        return None
+    if isinstance(raw, (str, bytes, Mapping)) or not isinstance(raw, Sequence) or len(raw) != _SHAPE_RANK:
+        raise FormatError(f"A mesh collection is three-dimensional, so `shape` is {_SHAPE_RANK} sizes, got {raw!r}.")
+    try:
+        sizes = tuple(int(size) for size in raw)
+    except (TypeError, ValueError) as error:
+        raise FormatError(f"`shape` is three whole numbers of voxels, got {raw!r}.") from error
+    if any(size < 0 for size in sizes):
+        raise FormatError(f"`shape` is a size, so no component is negative, got {raw!r}.")
+    return sizes  # type: ignore[return-value]
+
+
+def _read_axes(raw: Any) -> tuple[str, str, str] | None:  # noqa: ANN401
+    """Read a manifest's ``axes``, refusing names that cannot label the three vertex slots.
+
+    ``None`` is legitimate. Nothing in the format decodes through ``axes`` -- every component is
+    addressed by position -- so a collection without names is complete and self-consistent. The
+    names exist for the layer above, which has to say what those positions *mean*.
+    """
+    if raw is None:
+        return None
+    if isinstance(raw, (str, bytes, Mapping)) or not isinstance(raw, Sequence) or len(raw) != _SHAPE_RANK:
+        raise FormatError(f"A mesh collection is three-dimensional, so `axes` names {_SHAPE_RANK} axes, got {raw!r}.")
+    names = tuple(str(name) for name in raw)
+    if len(set(names)) != len(names):
+        raise FormatError(f"`axes` names each axis once, got {list(names)!r}.")
+    return names  # type: ignore[return-value]
+
+
 @dataclass(frozen=True)
 class Manifest:
     """``fabriks.json``: what a reader learns before opening a single Parquet file."""
@@ -390,15 +446,32 @@ class Manifest:
     grid: Grid
     encoding: Encoding
     spec_version: str = SPEC_VERSION
+    shape: tuple[int, int, int] | None = None
+    """ The size of the voxel space this collection was written into, ``(x, y, z)``, or None. """
+    axes: tuple[str, str, str] | None = None
+    """ What the three vertex slots are called, in slot order, or None when they were not named. """
     counts: dict[str, Any] = field(default_factory=dict)
     files: dict[str, Any] = field(default_factory=dict)
 
+    def __post_init__(self) -> None:
+        """Refuse a shape or an axis naming that cannot describe three positional slots."""
+        object.__setattr__(self, "shape", _read_shape(self.shape))
+        object.__setattr__(self, "axes", _read_axes(self.axes))
+
     def to_dict(self) -> dict[str, Any]:
-        """The manifest as it is written, with the resolved declarations rather than the input."""
+        """The manifest as it is written, with the resolved declarations rather than the input.
+
+        ``shape`` and ``axes`` are written even when they are ``null``, which is the point of
+        writing them: a manifest that states ``null`` was written by something that considered
+        the question and could not answer it, and one that omits the key entirely predates the
+        question. A consumer that has to bound this collection needs to tell those apart.
+        """
         return {
             "specVersion": self.spec_version,
             "grid": self.grid.to_dict(),
             "encoding": self.encoding.to_dict(),
+            "shape": None if self.shape is None else [int(size) for size in self.shape],
+            "axes": None if self.axes is None else list(self.axes),
             "counts": dict(self.counts),
             "files": dict(self.files),
         }
@@ -424,12 +497,15 @@ class Manifest:
                 "into a box and the blobs into geometry, and nothing else in the store states them."
             )
         # Keys this reader does not know are ignored rather than refused -- a manifest written
-        # by a layer that recorded something of its own stays readable, and an older one that
-        # carried an `axes` declaration opens unchanged.
+        # by a layer that recorded something of its own stays readable. `shape` and `axes` are
+        # absent from every manifest written before they existed, which is why they are read
+        # through `raw.get` and are allowed to stay None rather than being required.
         return cls(
             grid=Grid.from_dict(grid),
             encoding=Encoding.from_dict(encoding),
             spec_version=version,
+            shape=_read_shape(raw.get("shape")),
+            axes=_read_axes(raw.get("axes")),
             counts=dict(raw.get("counts") or {}),
             files=dict(raw.get("files") or {}),
         )

@@ -197,7 +197,7 @@ def test_a_level_is_found_by_listing_when_the_manifest_does_not_name_its_parts(
 
     opened = fabriks.open_collection(store, "collection")
 
-    assert opened.level_paths(0) == ["level=0/part-00000.parquet"], "the listing was not made relative again"
+    assert opened.level_paths(0) == ["level0/part-00000.parquet"], "the listing was not made relative again"
     assert opened.geometry(0).num_rows == collection.shards[0][1].num_rows
 
     entry = opened.cells_at(0)[0]
@@ -215,8 +215,34 @@ def test_the_listing_fallback_works_at_the_root_of_a_store(collection: fabriks.M
 
     opened = fabriks.open_collection(store)
 
-    assert opened.level_paths(1) == ["level=1/part-00000.parquet"]
+    assert opened.level_paths(1) == ["level1/part-00000.parquet"]
     assert opened.geometry(1).num_rows > 0
+
+
+def test_the_listing_fallback_still_finds_a_level_written_under_the_old_hive_name(
+    collection: fabriks.MeshCollection,
+):
+    """``level=0`` was the name before ``=`` turned out to be a signing hazard.
+
+    Both spellings declare the same specVersion, so the version number cannot tell a reader
+    which to expect. That only bites where a reader has to construct a level path at all --
+    a manifest naming no parts, which fabriks never writes and another writer might.
+    """
+    store = fabriks.MemoryStore()
+    fabriks.write_collection(collection, store, "collection")
+
+    stripped = json.loads(store.objects["collection/fabriks.json"])
+    stripped["files"] = {}
+    store.objects["collection/fabriks.json"] = json.dumps(stripped).encode()
+    for level in range(3):
+        store.objects[f"collection/level={level}/part-00000.parquet"] = store.objects.pop(
+            f"collection/level{level}/part-00000.parquet"
+        )
+
+    opened = fabriks.open_collection(store, "collection")
+
+    assert opened.level_paths(0) == ["level=0/part-00000.parquet"]
+    assert opened.geometry(0).num_rows == collection.shards[0][1].num_rows
 
 
 def test_a_level_with_nothing_stored_under_it_says_so(collection: fabriks.MeshCollection):
@@ -227,7 +253,7 @@ def test_a_level_with_nothing_stored_under_it_says_so(collection: fabriks.MeshCo
     stripped = json.loads(store.objects["collection/fabriks.json"])
     stripped["files"] = {}
     store.objects["collection/fabriks.json"] = json.dumps(stripped).encode()
-    del store.objects["collection/level=2/part-00000.parquet"]
+    del store.objects["collection/level2/part-00000.parquet"]
 
     opened = fabriks.open_collection(store, "collection")
 

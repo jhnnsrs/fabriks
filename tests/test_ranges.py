@@ -72,7 +72,7 @@ def chunked(wide: fabriks.MeshCollection) -> AccountingStore:
 
 def level_bytes(store: AccountingStore, level: int = 0) -> int:
     """How large one level is on disk -- the transfer a reader used to pay to draw one cell."""
-    return sum(len(body) for path, body in store.objects.items() if f"level={level}" in path)
+    return sum(len(body) for path, body in store.objects.items() if f"level{level}/" in path)
 
 
 def row_groups(collection: fabriks.Collection, level: int = 0) -> int:

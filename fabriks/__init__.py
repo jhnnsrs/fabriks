@@ -7,9 +7,13 @@ renderer can fetch the detail it needs for the view it has instead of the whole 
       fabriks.json                    <- the manifest, written LAST
       catalog/cells.parquet          <- the spatial index, one row per (level, cell)
       catalog/objects.parquet        <- the identity index, one row per object
-      level=0/part-00000.parquet     <- the geometry, finest level
-      level=1/part-00000.parquet
-      level=2/part-00000.parquet
+      level0/part-00000.parquet      <- the geometry, finest level
+      level1/part-00000.parquet
+      level2/part-00000.parquet
+
+Every name in that tree is letters, digits, ``-`` and ``.`` and nothing else, so that a path
+survives SigV4's canonicalisation identically whichever signer encodes it -- see
+:mod:`fabriks.manifest`.
 
 Writing one::
 

@@ -53,6 +53,7 @@ from fabriks.manifest import (
     Encoding,
     Grid,
     Manifest,
+    _read_axes,
     level_part_path,
 )
 from fabriks.octree import cell_box, morton_decode, morton_encode_one
@@ -160,6 +161,7 @@ def build_collection(
     *,
     cell_size: Sequence[int] | None = None,
     levels: int = 3,
+    axes: Sequence[str] | None = None,
     codec: str = CODEC_NONE,
     compression: str = COMPRESSION_NONE,
     simplifier: Simplifier | str | None = None,
@@ -172,17 +174,29 @@ def build_collection(
     Each value is a ``trimesh.Trimesh``, a :class:`fabriks.Mesh`, or a ``(vertices, faces)``
     pair. Vertices are in voxels, ordered ``(x, y, z)``.
 
-    **Components are positional throughout, and never named.** Vertex components, ``cell_size``
-    and the ``bbox_*`` columns are slots 0, 1 and 2, and nothing here asks which physical axis a
-    slot holds -- meshes off a ``(z, y, x)`` volume stay ``(z, y, x)``. What those slots *mean*
-    is a statement about how this collection relates to whatever it came from, which belongs to
-    the layer that owns the coordinate system and is recorded there, not here.
+    **Components are positional throughout, and never decoded through a name.** Vertex
+    components, ``cell_size``, ``shape`` and the ``bbox_*`` columns are slots 0, 1 and 2, and
+    nothing here reads a slot as a physical axis -- meshes off a ``(z, y, x)`` volume stay
+    ``(z, y, x)`` and are entirely consistent without any names at all.
+
+    ``axes`` names those three slots anyway, in slot order, and is written into the manifest
+    verbatim. It buys nothing *here* -- no code path reads it -- and everything one layer up:
+    it is the writer's record of what it was told the slots mean, which is the only thing a
+    consumer can check a caller's later re-declaration against. Left unset the manifest states
+    ``null``, and a consumer then has nothing to check against and must trust whatever it is
+    handed. **Pass it.** The mistake it exists to catch is declaring ``["z","y","x"]`` over
+    ``(x, y, z)`` vertices, which has no downstream symptom: a round trip is self-consistent
+    under either convention, and the result simply draws transposed.
 
     ``cell_size`` is the level-0 cell in voxels, ``(x, y, z)``. **Left unset it is chosen from
     the objects** by :func:`choose_cell_size` -- pass it when you know the source array's chunk
     shape, which is the value worth matching and the one no amount of looking at meshes can
     reveal. ``levels`` is how deep the octree goes; every level from 0 to ``levels - 1`` gets a
     file, because a gap is geometry a planner never asks for.
+
+    The manifest's ``shape`` is not a parameter: it is derived from the geometry that was
+    actually written, by :func:`_shape_of`. A size a caller could state is a size a caller could
+    state wrong, and this one is a fact about the bytes.
 
     ``simplifier`` is how a coarse level is made, and like ``codec`` it is a name out of a small
     vocabulary: ``"QUADRIC"`` (the default -- quadric-optimal shapes with the boundary pinned) or
@@ -197,8 +211,10 @@ def build_collection(
     schedule = decimation or Decimation.quarter()
 
     # Validated here rather than at the first blob, so a bad pair costs nothing instead of
-    # costing the whole clipping pass -- and the same for a missing optional codec.
+    # costing the whole clipping pass -- and the same for a missing optional codec and for
+    # `axes`, which the manifest would otherwise not check until every mesh had been cut.
     Encoding(codec=codec, compression=compression)
+    _read_axes(axes)  # unlaundered: `list("xyz")` would pass a string off as three names
     if codec == CODEC_MESHOPT:
         from fabriks.codecs import require_meshoptimizer
 
@@ -338,6 +354,9 @@ def build_collection(
     object_totals: dict[int, tuple[int, int]] = {object_id: (0, 0) for object_id in object_ids}
     #: The (low, high) corner of each object's bounds, in voxels.
     object_bounds: dict[int, tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]] = {}
+    #: The (low, high) corner of everything written, in voxels -- what `shape` is derived from.
+    collection_low: npt.NDArray[np.float64] | None = None
+    collection_high: npt.NDArray[np.float64] | None = None
 
     for level in range(levels):
         rows: list[dict[str, Any]] = []
@@ -375,6 +394,12 @@ def build_collection(
             vertices = np.vstack(all_vertices)
             faces = np.vstack(all_faces)
             low, high = vertices.min(axis=0), vertices.max(axis=0)
+            # Every level, not just level 0: a quadric collapse places a surviving vertex at the
+            # quadric-optimal position, which can sit slightly outside the hull of the vertices
+            # it replaced. Taking the union over what was actually written is the only bound
+            # that cannot be narrower than the geometry.
+            collection_low = low if collection_low is None else np.minimum(collection_low, low)
+            collection_high = high if collection_high is None else np.maximum(collection_high, high)
 
             _, extent = cell_box(cell, level, grid.cell_size)
             lod_error = float(extent.max() / QUANT_MAX + displacement.get((level, cell), 0.0))
@@ -463,6 +488,8 @@ def build_collection(
     manifest = Manifest(
         grid=grid,
         encoding=Encoding(codec=codec, compression=compression, decimation=schedule.declaration),
+        shape=_shape_of(collection_low, collection_high),
+        axes=None if axes is None else tuple(axes),  # type: ignore[arg-type]
         counts={
             "objects": len(object_ids),
             "cellsPerLevel": [len(per_level[level]) for level in range(levels)],
@@ -480,6 +507,38 @@ def build_collection(
         shards=shards,
         manifest=manifest,
     )
+
+
+def _shape_of(
+    low: npt.NDArray[np.float64] | None, high: npt.NDArray[np.float64] | None
+) -> tuple[int, int, int] | None:
+    """The size of the voxel space this collection was written into, ``(x, y, z)``, or None.
+
+    **A size, not a box.** ``shape`` says the geometry lies within ``[0, shape[i]]`` along each
+    slot, in voxels, and says nothing else. Anchoring it at the origin costs nothing here
+    because a collection cannot reach below the origin in the first place: cell indices are
+    ``floor(vertex / cell_size)`` and :func:`fabriks.octree.morton_encode` refuses a negative
+    one, so a collection that got as far as having bounds has non-negative ones. ``low`` is
+    taken rather than assumed only so that a future octree which lifts that restriction fails
+    here, loudly, instead of writing a size that omits everything on its low side.
+
+    A size is also not a voxel count. A collection is continuous geometry, so ``shape`` is the
+    smallest whole number of voxels that contains it, and a reader turning it back into a box
+    uses ``[0, shape]`` -- **not** the ``[-0.5, shape - 0.5]`` an array's shape implies. There
+    is no voxel to be at the centre of here.
+
+    None only where nothing was written: every fragment can drop out as degenerate, and a
+    collection with no cells has no bounds to state.
+    """
+    if low is None or high is None:
+        return None
+    if bool(np.any(low < 0.0)):
+        raise FormatError(
+            f"This collection's lowest corner is {tuple(float(component) for component in low)}, which is below the "
+            f"origin an octree cell index is counted from. `shape` is origin-anchored, so no size describes this "
+            f"collection -- shift the geometry into the positive octant before building it."
+        )
+    return tuple(int(np.ceil(float(component))) for component in high)  # type: ignore[return-value]
 
 
 def _warn_if_decimation_missed(

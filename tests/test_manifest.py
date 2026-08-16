@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import re
+from urllib.parse import quote
 
 import pytest
 
@@ -38,9 +40,31 @@ def test_the_layout_is_the_one_the_format_fixes():
     assert fabriks.MANIFEST_NAME == "fabriks.json"
     assert fabriks.CELL_CATALOG_PATH == "catalog/cells.parquet"
     assert fabriks.OBJECT_CATALOG_PATH == "catalog/objects.parquet"
-    assert level_prefix(2) == "level=2"
-    assert level_part_path(2) == "level=2/part-00000.parquet"
-    assert level_part_path(0, 13) == "level=0/part-00013.parquet"
+    assert level_prefix(2) == "level2"
+    assert level_part_path(2) == "level2/part-00000.parquet"
+    assert level_part_path(0, 13) == "level0/part-00013.parquet"
+
+
+def test_every_name_the_format_fixes_survives_being_signed():
+    """A path component ends up inside a signed URL, and SigV4 signs the *encoded* path.
+
+    A name outside RFC 3986's unreserved set is a name an SDK, a proxy and a hand-rolled
+    presigner each spell differently in the canonical request -- ``level=0`` becomes ``level%3D0``
+    for one of them and stays put for the next -- and the failure is a ``SignatureDoesNotMatch``
+    on a key the store is perfectly happy with. So every segment here is letters, digits, ``-``
+    and ``.``, which percent-encode to themselves, and ``quote`` leaves the whole path alone.
+
+    ``~`` is excluded even though RFC 3986 calls it unreserved: it is the other character signers
+    disagree about, since older ones emit ``%7E`` where the spec says leave it bare. Nothing here
+    contains one, so the tighter set costs nothing and refuses one that appears later.
+    """
+    paths = [fabriks.MANIFEST_NAME, fabriks.CELL_CATALOG_PATH, fabriks.OBJECT_CATALOG_PATH]
+    paths += [level_part_path(level, part) for level in (0, 1, 9, 10) for part in (0, 7, 99999)]
+
+    for path in paths:
+        for segment in path.split("/"):
+            assert re.fullmatch(r"[A-Za-z0-9._-]+", segment), f"{segment!r} of {path!r} is not a signable name"
+        assert quote(path, safe="/") == path, f"{path!r} is not the string a canonical request would sign"
 
 
 def test_a_manifest_round_trips_through_its_own_bytes():

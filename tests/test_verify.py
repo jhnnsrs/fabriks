@@ -104,7 +104,7 @@ def test_an_unknown_tier_is_refused(sound: fabriks.MemoryStore):
 
 def test_a_missing_file_is_reported_rather_than_raised(sound: fabriks.MemoryStore):
     """The manifest is a promise about the tree; this is the check that it was kept."""
-    del sound.objects["c/level=1/part-00000.parquet"]
+    del sound.objects["c/level1/part-00000.parquet"]
 
     assert "files exist" in failed(sound, tier="structure")
 
@@ -192,20 +192,20 @@ def test_a_wrong_vertex_count_is_caught_when_the_blob_is_decoded(sound: fabriks.
 
 def test_a_truncated_blob_is_caught(sound: fabriks.MemoryStore):
     """The failure a codec produces is garbage, not an exception, so something must ask."""
-    table = parquet_to_table(sound.objects["c/level=0/part-00000.parquet"])
+    table = parquet_to_table(sound.objects["c/level0/part-00000.parquet"])
     positions = table.column("positions").to_pylist()
     positions[0] = positions[0][: len(positions[0]) // 2]
-    edit_geometry(sound, "level=0/part-00000.parquet", "positions", positions)
+    edit_geometry(sound, "level0/part-00000.parquet", "positions", positions)
 
     assert "every blob decodes to the counts its row claims" in failed(sound, tier="blobs")
 
 
 def test_a_geometry_row_holding_an_unknown_object_is_caught(sound: fabriks.MemoryStore):
     """The forward and inverted identity indexes are written from one source and must agree."""
-    table = parquet_to_table(sound.objects["c/level=0/part-00000.parquet"])
+    table = parquet_to_table(sound.objects["c/level0/part-00000.parquet"])
     ids = table.column("object_ids").to_pylist()
     ids[0] = [*ids[0][:-1], 4_711]
-    edit_geometry(sound, "level=0/part-00000.parquet", "object_ids", ids)
+    edit_geometry(sound, "level0/part-00000.parquet", "object_ids", ids)
 
     assert "the two catalogs agree about who is in which cell" in failed(sound, tier="blobs")
 
@@ -269,7 +269,7 @@ def test_a_boundary_vertex_that_moved_is_caught(sound: fabriks.MemoryStore):
     # coarsest often does not: when the whole collection fits in one cell there is nothing
     # lying on that cell's faces, and the claim has no content there.
     for level in range(LEVELS - 1, 0, -1):
-        path = f"level={level}/part-00000.parquet"
+        path = f"level{level}/part-00000.parquet"
         table = parquet_to_table(sound.objects[f"c/{path}"])
         cells = table.column("cell").to_pylist()
         counts = table.column("vertex_count").to_pylist()
@@ -362,7 +362,7 @@ def test_the_on_plane_tolerance_is_cell_relative_and_not_voxels():
 
 def test_the_report_reads_as_something_a_person_would_read(sound: fabriks.MemoryStore):
     """A report nobody can read is a report nobody reads."""
-    del sound.objects["c/level=1/part-00000.parquet"]
+    del sound.objects["c/level1/part-00000.parquet"]
 
     report = verify(opened(sound), tier="structure")
 

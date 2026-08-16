@@ -178,7 +178,7 @@ def test_the_planner_reads_only_the_cell_catalog(written: fabriks.MemoryStore):
             self.objects = dict(objects)
 
         def get(self, path: str) -> bytes:
-            if "level=" in path:
+            if "/level" in path:
                 raise AssertionError(f"the planner opened geometry: {path}")
             return super().get(path)
 

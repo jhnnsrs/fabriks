@@ -22,14 +22,15 @@ my-collection/
   fabriks.json                  <- Root manifest (written last; atomic completion signal & checksums)
   catalog/cells.parquet        <- Spatial index (maps level & cell_key to row group byte locators)
   catalog/objects.parquet      <- Identity index (maps object IDs to cell keys for isolation/extraction)
-  level=0/part-00000.parquet   <- Level 0 full-detail geometry
-  level=1/part-00000.parquet   <- Decimated coarse-level geometry (L=1, L=2, ...)
+  level0/part-00000.parquet    <- Level 0 full-detail geometry
+  level1/part-00000.parquet    <- Decimated coarse-level geometry (L=1, L=2, ...)
 
 ```
 
 * **Spatial Octree**: Space is partitioned into uniform 3D cells (`cell_size`). Each parent cell at level `L >= 1` merges 8 child cells (2×2×2) from level `L - 1`.
 * **Seam Locking**: Vertices on cell boundary planes stay pinned during decimation so fine and coarse cells tile seamlessly without visual gaps.
 * **Morton Ordering**: Geometry row groups are sorted along a Z-order curve (Morton space) for spatially compact, range-query-friendly byte fetches.
+* **Signable Paths**: Every directory and file name is letters, digits, `-` and `.` — no `=`, no `~`, nothing else outside RFC 3986's unreserved set. A key spelled this way percent-encodes to itself, so SigV4's canonical request is the same string whichever SDK, proxy or hand-rolled presigner builds it, and a presigned fetch cannot fail with `SignatureDoesNotMatch` over an encoding disagreement.
 
 ---
 

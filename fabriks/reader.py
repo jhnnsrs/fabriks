@@ -275,6 +275,25 @@ class Collection:
         """How this collection's blobs are packed."""
         return self.manifest.encoding
 
+    @property
+    def shape(self) -> tuple[int, int, int] | None:
+        """The size of the voxel space this collection was written into, or None if unstated.
+
+        ``[0, shape[i]]`` per slot, in voxels -- a size, not an array's shape, so there is no
+        half-voxel to centre on. None where the writer could not state one origin-anchored;
+        the cell catalog's ``bbox_*`` columns are the exact bound in that case, and always.
+        """
+        return self.manifest.shape
+
+    @property
+    def axes(self) -> tuple[str, str, str] | None:
+        """What the writer said the three vertex slots mean, in slot order, or None.
+
+        Nothing here decodes through it -- every component is addressed by position. It is
+        carried so the layer that re-declares these names has something to be checked against.
+        """
+        return self.manifest.axes
+
     def _read_manifest(self) -> Manifest:
         """Fetch and parse ``fabriks.json``, naming a missing one as an unfinished write."""
         path = join(self.prefix, MANIFEST_NAME)
@@ -451,9 +470,20 @@ class Collection:
         if declared is not None:
             return declared
         head = level_prefix(level)
+        # The Hive-style name levels were once written under. Nothing fabriks writes reaches here
+        # at all -- `build_collection` always names every part in `files.levels` -- so the second
+        # listing is for a hand-written or third-party manifest that names no parts and laid its
+        # levels out the old way. Both spellings declare the same specVersion, so the version
+        # number cannot tell a reader which to expect and it has to try the other.
+        legacy = f"level={int(level)}"
         found = [path for path in list_paths(self.store, join(self.prefix, head)) if path.endswith(".parquet")]
         if not found:
-            raise FormatError(f"This collection declares {self.grid.levels} levels but nothing is stored under {head!r}.")
+            found = [path for path in list_paths(self.store, join(self.prefix, legacy)) if path.endswith(".parquet")]
+        if not found:
+            raise FormatError(
+                f"This collection declares {self.grid.levels} levels but nothing is stored under {head!r}, "
+                f"nor under {legacy!r}, the name levels were written under before it."
+            )
         # A listing is absolute within the store; make it relative to the collection again.
         head_prefix = join(self.prefix, "")
         return [
