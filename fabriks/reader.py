@@ -65,6 +65,19 @@ def _optional_int(column: Sequence[Any], row: int) -> int | None:
     return None if value is None else int(value)
 
 
+def _optional_str(column: Sequence[Any], row: int) -> str | None:
+    """One nullable string out of a column a writer may not have written at all.
+
+    A direct counterpart to :func:`_optional_int`, and deliberately not part of the
+    ``_present``/``_int``/``_float`` family: those refuse a null, and a null here is legitimate --
+    a collection whose objects are only partly named has one on every unnamed row.
+    """
+    if row >= len(column):
+        return None
+    value = column[row]
+    return None if value is None else str(value)
+
+
 def _present(columns: Mapping[str, Sequence[Any]], name: str, row: int) -> Any:  # noqa: ANN401
     """One value out of a column the format declares non-null, or a refusal naming it.
 
@@ -190,6 +203,10 @@ class ObjectEntry:
     vertex_count: int
     index_count: int
     cells: tuple[tuple[int, int], ...]
+    #: What this object was called in the file it was imported from, if anything recorded it.
+    #: Written by :mod:`fabriks.contrib` as an extra catalog column; None on every collection
+    #: that came from geometry already in memory, which is most of them.
+    name: str | None = None
 
     def cells_at(self, level: int) -> tuple[int, ...]:
         """The cells holding this object at one level."""
@@ -388,6 +405,7 @@ class Collection:
                 cells=tuple(
                     (int(item["level"]), int(item["cell"])) for item in _present(columns, "cells", row)
                 ),
+                name=_optional_str(columns.get("name", []), row),
             )
             entries[entry.object_id] = entry
         return entries

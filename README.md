@@ -105,6 +105,38 @@ cells = await collection.aread_cells([(e.level, e.cell) for e in plan], concurre
 
 ---
 
+**Foreign Formats**
+
+`fabriks.contrib` reads the formats a model usually arrives in and writes them back out. 
+
+```python
+from fabriks.contrib import read_glb, write_obj
+import fabriks
+
+imported = read_glb("bunny.glb", store, "bunny", levels=4)
+
+collection = fabriks.open_collection(store, "bunny")
+blob = write_obj(collection, level=2)          # or write to a path: write_obj(collection, "out.obj")
+
+```
+
+| Format | Identity | Notes |
+| --- | --- | --- |
+| `GLB` | per object | One file; reads from bytes or a path. The best round trip here. |
+| `GLTF` | per object | Several files — `write_gltf` returns `{name: bytes}`, which `read_gltf` takes back. |
+| `OBJ` | per object | Identity rides on `o` markers; materials are skipped. |
+| `PLY` / `STL` / `OFF` | single object | No object names in the format; a write merges every object into one mesh. |
+
+*3MF and DAE are deliberately absent* — trimesh reads neither without `networkx` / `pycollada`, and a function that is always an `ImportError` is a worse contract than one that is not there.
+
+**The fit.** A collection lives in a positive, whole-number voxel space; a mesh file is usually centred on the origin and a couple of units across, which fabriks refuses outright and could not partition anyway. So `read_*` scales the model so its longest side spans `resolution` voxels (512 by default) and shifts it clear of the origin. The transform and each object's source name ride on the object catalog as extra columns — which the format allows on purpose — so `write_*` inverts the import's own numbers and a round trip lands back on the source's coordinates. Pass `fit=VoxelFit.identity()` for a model already in voxel coordinates.
+
+**Identity.** An object named with a plain integer keeps that number as its id, so a collection written out and read back comes home with the ids it left with. Any other name is assigned the lowest free id and its string is kept in the catalog's `name` column, readable as `collection.objects[id].name`.
+
+**Round trips are not exact.** Positions are 16-bit quantized per cell, so geometry comes back within about one quantum (`cell_size / 65535`) of where it went in, never on it. Compare bounds and shape, not vertex arrays — `object_mesh` welds an object's pieces back together, so neither vertex count nor order survives either.
+
+---
+
 **Configuration**
 
 | Protocol | Options | Notes |
