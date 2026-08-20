@@ -35,7 +35,9 @@ keeps ``object_index_offsets`` meaningful.
 normals
 -------
 Omitted, and therefore absent from both the ``encoding`` object and the shard columns. An
-omitted normal encoding means the renderer computes vertex normals itself.
+omitted normal encoding means the renderer computes vertex normals itself. What that buys
+and what it costs -- including the shading seam it leaves along cell planes, which
+``boundary: LOCKED`` does not address -- is ``NORMALS.md`` at the repository root.
 
 codec / compression
 -------------------

@@ -135,6 +135,8 @@ blob = write_obj(collection, level=2)          # or write to a path: write_obj(c
 
 **Round trips are not exact.** Positions are 16-bit quantized per cell, so geometry comes back within about one quantum (`cell_size / 65535`) of where it went in, never on it. Compare bounds and shape, not vertex arrays — `object_mesh` welds an object's pieces back together, so neither vertex count nor order survives either.
 
+**Surfaces only.** Normals, UVs, materials and vertex colours are not carried: a renderer computes vertex normals from positions and winding. Hard edges authored as split vertices do survive that — splitting is topology, and topology round trips — but only while an object stays inside a single cell. Once it spans cells, clipping and the position-only weld fuse the split, and a flat-shaded box comes back smoothed. [NORMALS.md](NORMALS.md) is what the decision buys, what it costs, and the measurements either way.
+
 ---
 
 **Configuration**
