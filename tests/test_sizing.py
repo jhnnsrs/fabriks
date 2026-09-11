@@ -43,7 +43,9 @@ def surface() -> dict[int, Any]:
     how per-cell load moves up the levels, so a bracket calibrated on one alone would be too
     narrow, and the estimate tests below run against both on purpose.
     """
-    return {1: trimesh.creation.icosphere(radius=400.0, subdivisions=4).apply_translation([420.0] * 3)}
+    return {
+        1: trimesh.creation.icosphere(radius=400.0, subdivisions=4).apply_translation([420.0] * 3)
+    }
 
 
 @pytest.fixture(scope="module")
@@ -56,7 +58,11 @@ def scattered() -> dict[int, Any]:
     """
     objects: dict[int, Any] = {}
     for index in range(32):
-        centre = [120.0 + index * 90.0, 260.0 + 120.0 * np.sin(index * 0.7), 130.0 + 60.0 * np.cos(index * 0.5)]
+        centre = [
+            120.0 + index * 90.0,
+            260.0 + 120.0 * np.sin(index * 0.7),
+            130.0 + 60.0 * np.cos(index * 0.5),
+        ]
         if index % 3 == 0:
             body = trimesh.creation.icosphere(radius=26.0, subdivisions=3)
         elif index % 3 == 1:
@@ -99,7 +105,9 @@ def test_a_bigger_cell_budget_never_asks_for_a_smaller_cell(objects):
     A planner that picked the *closest* rung rather than the largest one under the budget would
     fail this: it could jump down a rung as the budget rises past a midpoint.
     """
-    sizes = [np.prod(plan_quietly(objects, cell_bytes=b).cell_size) for b in (1024, 4096, 16384, 65536)]
+    sizes = [
+        np.prod(plan_quietly(objects, cell_bytes=b).cell_size) for b in (1024, 4096, 16384, 65536)
+    ]
     assert sizes == sorted(sizes), f"cell volume is not monotone in cell_bytes: {sizes}"
 
 
@@ -110,8 +118,12 @@ def test_a_bigger_layer_budget_never_asks_for_more_levels(objects):
     `max_levels`, and either could break the ordering if the stopping rule were written the
     other way round.
     """
-    depths = [plan_quietly(objects, layer_bytes=b).levels for b in (8 * 1024, 64 * 1024, 1024 * 1024)]
-    assert depths == sorted(depths, reverse=True), f"levels is not monotone in layer_bytes: {depths}"
+    depths = [
+        plan_quietly(objects, layer_bytes=b).levels for b in (8 * 1024, 64 * 1024, 1024 * 1024)
+    ]
+    assert depths == sorted(depths, reverse=True), (
+        f"levels is not monotone in layer_bytes: {depths}"
+    )
 
 
 def test_a_layer_budget_that_already_holds_everything_gives_one_level(objects):
@@ -143,7 +155,9 @@ def test_a_cell_below_the_object_fit_is_warned_about_and_still_returned(objects)
         f"expected an object-fit warning, got {[str(entry.message) for entry in caught]}"
     )
 
-    fit = fabriks.choose_cell_size({key: fabriks.coerce_mesh(value) for key, value in objects.items()})
+    fit = fabriks.choose_cell_size(
+        {key: fabriks.coerce_mesh(value) for key, value in objects.items()}
+    )
     assert plan.object_fit == fit, "the plan reports a different fit than choose_cell_size"
     assert any(a < b for a, b in zip(plan.cell_size, fit)), "nothing was actually below the fit"
     assert plan.levels >= 1
@@ -157,7 +171,9 @@ def test_a_cell_index_never_passes_the_morton_limit(objects):
     after the clipping has run is the expensive way to find out.
     """
     far = dict(objects)
-    far[99] = trimesh.creation.box(extents=[10.0, 10.0, 10.0]).apply_translation([4.0e6, 10.0, 10.0])
+    far[99] = trimesh.creation.box(extents=[10.0, 10.0, 10.0]).apply_translation(
+        [4.0e6, 10.0, 10.0]
+    )
 
     plan = plan_quietly(far, cell_bytes=1024)
     reach = [int(np.ceil(4.01e6 / component)) for component in plan.cell_size]
@@ -206,7 +222,9 @@ def test_a_plan_deep_on_cells_under_the_object_fit_warns_that_the_build_may_rais
     )
 
 
-@pytest.mark.parametrize(("cell_bytes", "layer_bytes"), [(16 * 1024, 128 * 1024), (32 * 1024, 512 * 1024)])
+@pytest.mark.parametrize(
+    ("cell_bytes", "layer_bytes"), [(16 * 1024, 128 * 1024), (32 * 1024, 512 * 1024)]
+)
 def test_a_plan_that_does_not_warn_builds_without_raising(scattered, cell_bytes, layer_bytes):
     """The warning above has to be the *only* way into the failure, or it is not worth having.
 
@@ -230,7 +248,9 @@ def test_geometry_in_the_negative_octant_is_refused_rather_than_planned_around(o
     table being computed for a grid that cannot exist.
     """
     shifted = dict(objects)
-    shifted[42] = trimesh.creation.box(extents=[10.0, 10.0, 10.0]).apply_translation([-50.0, 10.0, 10.0])
+    shifted[42] = trimesh.creation.box(extents=[10.0, 10.0, 10.0]).apply_translation(
+        [-50.0, 10.0, 10.0]
+    )
 
     with pytest.raises(fabriks.FormatError, match="positive octant"):
         fabriks.plan_grid(shifted)

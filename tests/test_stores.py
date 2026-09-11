@@ -33,11 +33,15 @@ def test_obstore_satisfies_the_protocol_with_no_adapter():
 
     store = obstore.store.MemoryStore()
 
-    assert isinstance(store, FabriksStore), "obstore no longer satisfies the protocol fabriks writes through"
+    assert isinstance(store, FabriksStore), (
+        "obstore no longer satisfies the protocol fabriks writes through"
+    )
 
 
 @pytest.mark.parametrize("kind", ["memory", "directory", "obstore-local", "obstore-memory"])
-def test_the_same_tree_lands_in_every_kind_of_store(collection: fabriks.MeshCollection, tmp_path: Path, kind: str):
+def test_the_same_tree_lands_in_every_kind_of_store(
+    collection: fabriks.MeshCollection, tmp_path: Path, kind: str
+):
     """On disk or on S3, the layout is the layout. Nothing above the store knows which it has."""
     if kind == "memory":
         store: object = fabriks.MemoryStore()
@@ -68,7 +72,9 @@ def test_the_same_tree_lands_in_every_kind_of_store(collection: fabriks.MeshColl
     assert len(opened.cells) == collection.cell_catalog.num_rows
 
 
-def test_a_directory_store_writes_the_tree_a_shell_can_see(collection: fabriks.MeshCollection, tmp_path: Path):
+def test_a_directory_store_writes_the_tree_a_shell_can_see(
+    collection: fabriks.MeshCollection, tmp_path: Path
+):
     """The layout is meant to be legible on disk, not only through an API."""
     fabriks.write_collection(collection, DirectoryStore(tmp_path), "c")
 

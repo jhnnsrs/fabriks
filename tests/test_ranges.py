@@ -66,7 +66,9 @@ def wide(wide_objects: dict[int, Any]) -> fabriks.MeshCollection:
 def chunked(wide: fabriks.MeshCollection) -> AccountingStore:
     """The larger collection, written with row groups small enough to be worth locating."""
     store = AccountingStore()
-    fabriks.write_collection(store=store, collection=wide, prefix="c", row_group_bytes=ROW_GROUP_BYTES)
+    fabriks.write_collection(
+        store=store, collection=wide, prefix="c", row_group_bytes=ROW_GROUP_BYTES
+    )
     return store
 
 
@@ -91,7 +93,9 @@ def measured(chunked: AccountingStore) -> fabriks.Collection:
 
 def a_level_zero_cell(collection: fabriks.Collection) -> fabriks.CellEntry:
     """The first level-0 cell in Morton order, which is a cell like any other."""
-    return min((entry for entry in collection.cells.values() if entry.level == 0), key=lambda e: e.cell)
+    return min(
+        (entry for entry in collection.cells.values() if entry.level == 0), key=lambda e: e.cell
+    )
 
 
 def test_the_level_actually_splits_into_row_groups(chunked: AccountingStore):
@@ -246,7 +250,9 @@ def test_a_locator_pointing_at_the_wrong_row_group_is_caught(chunked: Accounting
     catalog = parquet_to_table(chunked.objects["c/catalog/cells.parquet"])
     groups = catalog.column("row_group").to_pylist()
     levels = catalog.column("level").to_pylist()
-    row = next(i for i, (level, group) in enumerate(zip(levels, groups)) if level == 0 and group == 0)
+    row = next(
+        i for i, (level, group) in enumerate(zip(levels, groups)) if level == 0 and group == 0
+    )
     moved = [max(groups) if index == row else group for index, group in enumerate(groups)]
     corrupted = catalog.set_column(
         catalog.schema.get_field_index("row_group"),
@@ -279,7 +285,9 @@ def test_blob_bytes_is_what_the_cell_actually_carries(measured: fabriks.Collecti
             assert entry.blob_bytes == sizes[entry.cell]
 
 
-def test_a_collection_whose_manifest_records_no_length_still_reads(collection: fabriks.MeshCollection):
+def test_a_collection_whose_manifest_records_no_length_still_reads(
+    collection: fabriks.MeshCollection,
+):
     """A hand-written manifest names paths and nothing else; that must be slow, not broken.
 
     The recorded byte length is what lets a reader seek to a Parquet footer without being able
@@ -347,7 +355,9 @@ def test_releasing_drops_the_geometry_and_keeps_the_catalogs(measured: fabriks.C
     assert len(measured.read_cell(entry.level, entry.cell).vertices) == entry.vertex_count
 
 
-def test_the_round_trip_is_unchanged_by_how_finely_it_was_chunked(collection: fabriks.MeshCollection):
+def test_the_round_trip_is_unchanged_by_how_finely_it_was_chunked(
+    collection: fabriks.MeshCollection,
+):
     """Row-group size is a transfer-shaping knob and must not touch the geometry."""
     coarse, fine = fabriks.MemoryStore(), fabriks.MemoryStore()
     fabriks.write_collection(collection, coarse, "c", row_group_bytes=1024 * 1024)

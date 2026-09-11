@@ -35,11 +35,15 @@ def objects() -> dict[int, Any]:
     """
     return {
         # Wider than a cell in x and y, so it is cut and its fragments share faces.
-        7: trimesh.creation.box(extents=[300.0, 170.0, 90.0]).apply_translation([260.0, 210.0, 95.0]),
+        7: trimesh.creation.box(extents=[300.0, 170.0, 90.0]).apply_translation(
+            [260.0, 210.0, 95.0]
+        ),
         # Comfortably inside one cell, and small.
         3: trimesh.creation.box(extents=[40.0, 24.0, 16.0]).apply_translation([90.0, 70.0, 40.0]),
         # A sphere, for geometry that is not axis-aligned.
-        11: trimesh.creation.icosphere(radius=26.0, subdivisions=2).apply_translation([420.0, 300.0, 150.0]),
+        11: trimesh.creation.icosphere(radius=26.0, subdivisions=2).apply_translation(
+            [420.0, 300.0, 150.0]
+        ),
     }
 
 

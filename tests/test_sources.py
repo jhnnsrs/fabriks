@@ -37,7 +37,10 @@ def test_a_fabriks_mesh_passes_through_unchanged():
 
 def test_bounds_match_trimeshs_attribute():
     """`bounds` is read the same way off either input shape, so it has to mean the same thing."""
-    mesh = Mesh(vertices=np.array([[1.0, 2.0, 3.0], [4.0, 6.0, 8.0]]), faces=np.zeros((0, 3), dtype=np.int64))
+    mesh = Mesh(
+        vertices=np.array([[1.0, 2.0, 3.0], [4.0, 6.0, 8.0]]),
+        faces=np.zeros((0, 3), dtype=np.int64),
+    )
     low, high = mesh.bounds
 
     assert low.tolist() == [1.0, 2.0, 3.0]

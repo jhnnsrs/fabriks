@@ -12,8 +12,21 @@ import fabriks
 
 #: Submodules are importable and not part of the surface `__all__` describes.
 _SUBMODULES = {
-    "build", "codecs", "contrib", "errors", "frames", "geometry", "manifest", "octree",
-    "planner", "reader", "simplifiers", "sizing", "sources", "stores", "writer",
+    "build",
+    "codecs",
+    "contrib",
+    "errors",
+    "frames",
+    "geometry",
+    "manifest",
+    "octree",
+    "planner",
+    "reader",
+    "simplifiers",
+    "sizing",
+    "sources",
+    "stores",
+    "writer",
 }
 
 
@@ -31,11 +44,7 @@ def test_nothing_public_is_left_out_of_the_promise():
     -- so callers find it, depend on it, and break when it moves. Either it belongs in
     ``__all__`` or it belongs behind an underscore.
     """
-    public = {
-        name
-        for name in dir(fabriks)
-        if not name.startswith("_") and name not in _SUBMODULES
-    }
+    public = {name for name in dir(fabriks) if not name.startswith("_") and name not in _SUBMODULES}
 
     assert not public - set(fabriks.__all__), (
         f"these are importable from `fabriks` but not in `__all__`: {sorted(public - set(fabriks.__all__))}"

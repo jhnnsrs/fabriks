@@ -28,7 +28,9 @@ def round_trip_at(point: np.ndarray, level: int) -> np.ndarray:
     blob = fabriks.encode_positions(
         point.reshape(1, 3), cell=cell, level=level, cell_size=CELL_SIZE, codec=fabriks.CODEC_NONE
     )
-    return fabriks.decode_positions(blob, cell=cell, level=level, cell_size=CELL_SIZE, codec=fabriks.CODEC_NONE)[0]
+    return fabriks.decode_positions(
+        blob, cell=cell, level=level, cell_size=CELL_SIZE, codec=fabriks.CODEC_NONE
+    )[0]
 
 
 def test_a_plane_shared_by_every_level_decodes_identically_at_every_level():
@@ -58,11 +60,15 @@ def test_a_tangential_coordinate_is_snapped_onto_the_coarsest_lattice():
 
     step = COARSE_EXTENT / QUANT_MAX
     residual = snapped[0, 1:] / step[1:]
-    assert residual == pytest.approx(np.rint(residual), abs=1e-9), "a tangential coordinate is off the lattice"
+    assert residual == pytest.approx(np.rint(residual), abs=1e-9), (
+        "a tangential coordinate is off the lattice"
+    )
 
     decoded = [round_trip_at(snapped[0], level) for level in range(LEVELS)]
     for level, position in enumerate(decoded[1:], start=1):
-        assert position == pytest.approx(decoded[0], abs=1e-9), f"level {level} disagrees with level 0 along the face"
+        assert position == pytest.approx(decoded[0], abs=1e-9), (
+            f"level {level} disagrees with level 0 along the face"
+        )
 
 
 def test_an_interior_vertex_is_left_alone():
@@ -106,7 +112,9 @@ def test_decimation_never_moves_a_fixed_vertex():
     kept, _, _ = decimate_fixed(vertices, faces, fixed=fixed, target_faces=16)
 
     for locked in vertices[fixed]:
-        assert np.isclose(kept, locked).all(axis=1).any(), "a fixed vertex was moved or collapsed away"
+        assert np.isclose(kept, locked).all(axis=1).any(), (
+            "a fixed vertex was moved or collapsed away"
+        )
 
 
 def test_decimation_reaches_its_target_when_nothing_is_pinned():

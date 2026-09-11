@@ -23,13 +23,17 @@ def test_a_generous_error_budget_stops_at_the_coarsest_level(opened: fabriks.Col
     """The other end: one cell, the whole collection, as coarse as it goes."""
     plan = opened.plan(error_budget=1e9)
 
-    assert [(entry.level, entry.cell) for entry in plan] == [(entry.level, entry.cell) for entry in opened.roots()]
+    assert [(entry.level, entry.cell) for entry in plan] == [
+        (entry.level, entry.cell) for entry in opened.roots()
+    ]
 
 
 def test_a_tighter_budget_never_returns_a_coarser_plan(opened: fabriks.Collection):
     """Monotonicity: spending less error can only add detail, never remove it."""
     budgets = [1e9, 10.0, 1.0, 0.1, 0.0]
-    face_counts = [sum(entry.face_count for entry in opened.plan(error_budget=budget)) for budget in budgets]
+    face_counts = [
+        sum(entry.face_count for entry in opened.plan(error_budget=budget)) for budget in budgets
+    ]
 
     assert face_counts == sorted(face_counts), f"tightening the budget lost detail: {face_counts}"
 
@@ -49,7 +53,9 @@ def test_the_plan_covers_the_collection_without_drawing_a_cell_twice(opened: fab
             for other in plan:
                 if entry is other or other.level >= entry.level:
                     continue
-                assert not _is_ancestor(entry, other), f"{entry.cell}@{entry.level} covers {other.cell}@{other.level}"
+                assert not _is_ancestor(entry, other), (
+                    f"{entry.cell}@{entry.level} covers {other.cell}@{other.level}"
+                )
 
 
 def _is_ancestor(coarse: fabriks.CellEntry, fine: fabriks.CellEntry) -> bool:
@@ -59,12 +65,18 @@ def _is_ancestor(coarse: fabriks.CellEntry, fine: fabriks.CellEntry) -> bool:
     return (i >> steps, j >> steps, k >> steps) == coarse.triple
 
 
-def test_a_camera_spends_the_budget_in_pixels_and_so_depends_on_distance(opened: fabriks.Collection):
+def test_a_camera_spends_the_budget_in_pixels_and_so_depends_on_distance(
+    opened: fabriks.Collection,
+):
     """The reason for an octree: a far cell settles coarse, a near one descends."""
     centre = np.mean([entry.bbox_min for entry in opened.cells.values()], axis=0)
 
-    near = fabriks.Camera.perspective(centre + np.array([0.0, 0.0, 40.0]), fov_y=0.8, viewport_height=1080)
-    far = fabriks.Camera.perspective(centre + np.array([0.0, 0.0, 40000.0]), fov_y=0.8, viewport_height=1080)
+    near = fabriks.Camera.perspective(
+        centre + np.array([0.0, 0.0, 40.0]), fov_y=0.8, viewport_height=1080
+    )
+    far = fabriks.Camera.perspective(
+        centre + np.array([0.0, 0.0, 40000.0]), fov_y=0.8, viewport_height=1080
+    )
 
     near_plan = opened.plan(camera=near, pixel_budget=1.0)
     far_plan = opened.plan(camera=far, pixel_budget=1.0)
@@ -76,12 +88,16 @@ def test_a_camera_spends_the_budget_in_pixels_and_so_depends_on_distance(opened:
 def test_a_camera_inside_a_cell_takes_the_finest_level_available(opened: fabriks.Collection):
     """Distance to the box, not to its centre -- otherwise a camera inside descends forever."""
     entry = opened.cells_at(0)[0]
-    inside = np.asarray(entry.bbox_min) + (np.asarray(entry.bbox_max) - np.asarray(entry.bbox_min)) / 2
+    inside = (
+        np.asarray(entry.bbox_min) + (np.asarray(entry.bbox_max) - np.asarray(entry.bbox_min)) / 2
+    )
 
     camera = fabriks.Camera.perspective(inside, fov_y=0.8, viewport_height=1080)
 
     assert math.isinf(camera.screen_error(entry))
-    assert (entry.level, entry.cell) in [(e.level, e.cell) for e in opened.plan(camera=camera, pixel_budget=1.0)]
+    assert (entry.level, entry.cell) in [
+        (e.level, e.cell) for e in opened.plan(camera=camera, pixel_budget=1.0)
+    ]
 
 
 def test_a_box_query_keeps_only_what_it_meets(opened: fabriks.Collection):
@@ -115,7 +131,7 @@ def test_a_frustum_culls_what_is_behind_it(opened: fabriks.Collection):
 
 
 def test_an_object_filter_resolves_through_the_object_catalog(opened: fabriks.Collection):
-    """"Where is segment 4711" answered as a lookup, then used to narrow the plan."""
+    """ "Where is segment 4711" answered as a lookup, then used to narrow the plan."""
     object_id = next(iter(opened.objects))
     named = set(opened.objects[object_id].cells)
 
@@ -126,7 +142,9 @@ def test_an_object_filter_resolves_through_the_object_catalog(opened: fabriks.Co
         assert (entry.level, entry.cell) in named
 
 
-def test_running_out_of_cells_degrades_detail_rather_than_dropping_geometry(opened: fabriks.Collection):
+def test_running_out_of_cells_degrades_detail_rather_than_dropping_geometry(
+    opened: fabriks.Collection,
+):
     """The failure mode matters: a missing cell is a hole in the surface, a coarse cell is not."""
     full = opened.plan(error_budget=0.0)
     capped = opened.plan(error_budget=0.0, max_cells=2)
@@ -137,7 +155,8 @@ def test_running_out_of_cells_degrades_detail_rather_than_dropping_geometry(open
     # Every region the full plan covers is still covered, just possibly by a coarser cell.
     for fine in full:
         assert any(
-            (coarse.level, coarse.cell) == (fine.level, fine.cell) or _is_ancestor(coarse, fine) for coarse in capped
+            (coarse.level, coarse.cell) == (fine.level, fine.cell) or _is_ancestor(coarse, fine)
+            for coarse in capped
         ), f"cell {fine.cell} at level {fine.level} is covered by nothing in the capped plan"
 
 
@@ -198,7 +217,9 @@ def test_planning_over_every_level_of_the_fixture(opened: fabriks.Collection):
     assert {entry.level for entry in mixed} <= set(range(LEVELS))
 
 
-def test_max_cells_caps_the_plan_when_the_budget_is_above_the_coarsest_level(opened: fabriks.Collection):
+def test_max_cells_caps_the_plan_when_the_budget_is_above_the_coarsest_level(
+    opened: fabriks.Collection,
+):
     """Above the floor it behaves as a cap, which is the case a fetch queue is sized for."""
     roots = len(opened.roots())
 
@@ -218,4 +239,6 @@ def test_max_cells_never_goes_below_the_coarsest_level(opened: fabriks.Collectio
     plan = opened.plan(error_budget=0.0, max_cells=1)
 
     assert len(plan) == len(roots)
-    assert {(entry.level, entry.cell) for entry in plan} == {(entry.level, entry.cell) for entry in roots}
+    assert {(entry.level, entry.cell) for entry in plan} == {
+        (entry.level, entry.cell) for entry in roots
+    }

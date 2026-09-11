@@ -63,8 +63,12 @@ def test_every_name_the_format_fixes_survives_being_signed():
 
     for path in paths:
         for segment in path.split("/"):
-            assert re.fullmatch(r"[A-Za-z0-9._-]+", segment), f"{segment!r} of {path!r} is not a signable name"
-        assert quote(path, safe="/") == path, f"{path!r} is not the string a canonical request would sign"
+            assert re.fullmatch(r"[A-Za-z0-9._-]+", segment), (
+                f"{segment!r} of {path!r} is not a signable name"
+            )
+        assert quote(path, safe="/") == path, (
+            f"{path!r} is not the string a canonical request would sign"
+        )
 
 
 def test_a_manifest_round_trips_through_its_own_bytes():
@@ -83,7 +87,12 @@ def test_the_stored_encoding_is_resolved_rather_than_sparse():
     written = json.loads(Manifest(grid=Grid((128, 128, 64), 3), encoding=Encoding()).to_json())
 
     assert set(written["encoding"]) == {
-        "positions", "indices", "codec", "compression", "boundary", "decimation",
+        "positions",
+        "indices",
+        "codec",
+        "compression",
+        "boundary",
+        "decimation",
     }
 
 
@@ -156,28 +165,41 @@ def test_the_cell_size_is_read_in_x_y_z_and_not_reversed():
 def test_a_manifest_key_this_reader_does_not_know_is_ignored_rather_than_refused():
     """A layer above may record something of its own beside the format's keys.
 
-    This is also what keeps an older collection readable: manifests written while the format
-    still carried an ``axes`` declaration open unchanged, and the key is simply not carried into
-    what this reader writes back.
+    The unknown key opens the manifest unchanged and is simply not carried into what this
+    reader writes back; the keys the format does know, such as ``axes``, are.
     """
     manifest = Manifest.from_dict(a_manifest(axes=["z", "y", "x"], somethingElse={"any": "shape"}))
 
     assert manifest.grid.cell_size == (128, 128, 64)
-    assert set(manifest.to_dict()) == {"specVersion", "grid", "encoding", "counts", "files"}
+    assert manifest.axes == ("z", "y", "x")
+    written = manifest.to_dict()
+    assert "somethingElse" not in written
+    assert set(written) == {"specVersion", "grid", "encoding", "counts", "files", "shape", "axes"}
 
 
-def test_the_manifest_states_nothing_about_what_a_component_means():
-    """Everything fabriks computes is positional, so naming the axes is a claim it cannot own.
+def test_shape_and_axes_are_carried_but_may_be_unknown():
+    """The manifest carries the collection's extent and axis names, each ``null`` when unknown.
 
-    Which physical axis a slot holds is a statement about this collection's relationship to the
-    image it came from, and that relationship lives in whatever owns the coordinate system. A
-    key here would be a claim nothing in the format could check, use or contradict -- so there
-    is none, and its absence is not an omission to fill in later.
+    Which physical axis a slot holds is a statement about this collection's relationship to
+    the image it came from, so a manifest built without that knowledge writes the key as
+    ``null`` rather than omitting it: a reader can tell "not declared" from "not a concept the
+    format has". Once declared, both round-trip as given.
     """
-    written = Manifest(grid=Grid((128, 128, 64), 3), encoding=Encoding()).to_dict()
+    bare = Manifest(grid=Grid((128, 128, 64), 3), encoding=Encoding()).to_dict()
 
-    assert "axes" not in written
-    assert set(written) == {"specVersion", "grid", "encoding", "counts", "files"}
+    assert set(bare) == {"specVersion", "grid", "encoding", "counts", "files", "shape", "axes"}
+    assert bare["shape"] is None
+    assert bare["axes"] is None
+
+    declared = Manifest(
+        grid=Grid((128, 128, 64), 3),
+        encoding=Encoding(),
+        shape=(256, 256, 128),
+        axes=("z", "y", "x"),
+    ).to_dict()
+
+    assert declared["shape"] == [256, 256, 128]
+    assert declared["axes"] == ["z", "y", "x"]
 
 
 def test_both_blob_knobs_default_to_nothing():

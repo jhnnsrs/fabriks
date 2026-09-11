@@ -46,7 +46,9 @@ def edit_catalog(store: fabriks.MemoryStore, column: str, values: list[Any]) -> 
     """Rewrite one column of the cell catalog in place."""
     table = parquet_to_table(store.objects["c/catalog/cells.parquet"])
     replaced = table.set_column(
-        table.schema.get_field_index(column), table.schema.field(column), pa.array(values, type=table.schema.field(column).type)
+        table.schema.get_field_index(column),
+        table.schema.field(column),
+        pa.array(values, type=table.schema.field(column).type),
     )
     store.objects["c/catalog/cells.parquet"] = table_to_parquet(replaced)
 
@@ -62,7 +64,9 @@ def edit_geometry(store: fabriks.MemoryStore, path: str, column: str, values: li
     key = f"c/{path}"
     table = parquet_to_table(store.objects[key])
     replaced = table.set_column(
-        table.schema.get_field_index(column), table.schema.field(column), pa.array(values, type=table.schema.field(column).type)
+        table.schema.get_field_index(column),
+        table.schema.field(column),
+        pa.array(values, type=table.schema.field(column).type),
     )
     body = table_to_parquet(replaced)
     store.objects[key] = body
@@ -235,7 +239,9 @@ def test_a_coarse_level_larger_than_the_one_below_is_caught(sound: fabriks.Memor
     counts = [count * 100 if level == LEVELS - 1 else count for level, count in zip(levels, counts)]
     edit_catalog(sound, "index_count", counts)
 
-    assert "a coarse level holds less than the level it summarises" in failed(sound, tier="geometry")
+    assert "a coarse level holds less than the level it summarises" in failed(
+        sound, tier="geometry"
+    )
 
 
 def test_an_lod_error_too_small_to_be_true_is_caught(sound: fabriks.MemoryStore):
@@ -299,7 +305,11 @@ def test_a_boundary_vertex_that_moved_is_caught(sound: fabriks.MemoryStore):
             centre = origin + extent / 2.0
             vertices[target] += np.sign(centre - vertices[target]) * (extent / 64.0)
             positions[row] = encode_positions(
-                vertices, cell=cell, level=level, cell_size=collection.grid.cell_size, codec=collection.encoding.codec
+                vertices,
+                cell=cell,
+                level=level,
+                cell_size=collection.grid.cell_size,
+                codec=collection.encoding.codec,
             )
             edit_geometry(sound, path, "positions", positions)
             break
@@ -309,7 +319,9 @@ def test_a_boundary_vertex_that_moved_is_caught(sound: fabriks.MemoryStore):
     else:
         pytest.fail("the fixture has no pinned vertex at any level to displace")
 
-    assert "on-plane vertices are held fixed across levels (boundary: LOCKED)" in failed(sound, tier="geometry")
+    assert "on-plane vertices are held fixed across levels (boundary: LOCKED)" in failed(
+        sound, tier="geometry"
+    )
 
 
 def test_a_surface_tangent_to_a_cell_plane_is_not_reported_as_drifted():
@@ -357,7 +369,9 @@ def test_the_on_plane_tolerance_is_cell_relative_and_not_voxels():
     assert on_planes(on_the_plane, extent, tolerance=quantum).all()
     assert not on_planes(half_a_voxel_off, extent, tolerance=quantum).any()
     # The voxel-valued tolerance the check used to pass, and what it swept in.
-    assert on_planes(half_a_voxel_off, extent, tolerance=float(extent.max()) / fabriks.QUANT_MAX).any()
+    assert on_planes(
+        half_a_voxel_off, extent, tolerance=float(extent.max()) / fabriks.QUANT_MAX
+    ).any()
 
 
 def test_the_report_reads_as_something_a_person_would_read(sound: fabriks.MemoryStore):
@@ -391,5 +405,7 @@ def test_the_manifest_and_the_report_agree_on_which_files_exist(sound: fabriks.M
 
     paths = verify_paths(opened(sound))
 
-    assert set(paths) == {path.removeprefix("c/") for path in sound.objects if path != "c/fabriks.json"}
+    assert set(paths) == {
+        path.removeprefix("c/") for path in sound.objects if path != "c/fabriks.json"
+    }
     assert json.loads(sound.objects["c/fabriks.json"])["files"]["cells"]["path"] in paths

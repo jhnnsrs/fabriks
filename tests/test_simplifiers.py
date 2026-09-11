@@ -33,13 +33,17 @@ def backend(name: str) -> fabriks.Simplifier:
 
 def a_sphere(subdivisions: int = 3) -> tuple[np.ndarray, np.ndarray]:
     """A closed surface with no boundary at all."""
-    mesh = trimesh.creation.icosphere(radius=20.0, subdivisions=subdivisions).apply_translation([50.0, 50.0, 50.0])
+    mesh = trimesh.creation.icosphere(radius=20.0, subdivisions=subdivisions).apply_translation(
+        [50.0, 50.0, 50.0]
+    )
     return np.asarray(mesh.vertices, dtype=np.float64), np.asarray(mesh.faces, dtype=np.int64)
 
 
 def a_cut_sheet() -> tuple[np.ndarray, np.ndarray]:
     """A surface with an open boundary -- the shape a clipped fragment actually has."""
-    mesh = trimesh.creation.icosphere(radius=20.0, subdivisions=3).apply_translation([50.0, 50.0, 50.0])
+    mesh = trimesh.creation.icosphere(radius=20.0, subdivisions=3).apply_translation(
+        [50.0, 50.0, 50.0]
+    )
     cut = trimesh.intersections.slice_mesh_plane(
         mesh, plane_normal=[0.0, 0.0, 1.0], plane_origin=[0.0, 0.0, 50.0], cap=False
     )
@@ -144,7 +148,9 @@ def test_the_quadric_backend_pins_the_boundary_and_frees_the_interior():
         )
 
     interior = np.setdiff1d(np.arange(len(vertices)), boundary)
-    unmoved = sum(bool((result.vertices == position).all(axis=1).any()) for position in vertices[interior])
+    unmoved = sum(
+        bool((result.vertices == position).all(axis=1).any()) for position in vertices[interior]
+    )
     assert unmoved < len(interior), "no interior vertex moved, so this is not a quadric collapse"
 
 
@@ -159,11 +165,17 @@ def test_the_quadric_backend_reports_a_tighter_error_than_the_fallback():
     fixed = np.zeros(len(vertices), dtype=bool)
     target = len(faces) // 4
 
-    quadric = fabriks.QuadricSimplifier().simplify(vertices, faces, fixed=fixed, target_faces=target)
-    greedy = fabriks.GreedyEdgeCollapse().simplify(vertices, faces, fixed=fixed, target_faces=target)
+    quadric = fabriks.QuadricSimplifier().simplify(
+        vertices, faces, fixed=fixed, target_faces=target
+    )
+    greedy = fabriks.GreedyEdgeCollapse().simplify(
+        vertices, faces, fixed=fixed, target_faces=target
+    )
 
     assert quadric.error < greedy.error
-    assert quadric.error < 0.4 * 20.0, "a radius-20 sphere at a quarter of its faces should not stray far"
+    assert quadric.error < 0.4 * 20.0, (
+        "a radius-20 sphere at a quarter of its faces should not stray far"
+    )
 
 
 def test_the_deviation_measure_is_an_upper_bound_and_grows_with_reduction():
@@ -172,7 +184,9 @@ def test_the_deviation_measure_is_an_upper_bound_and_grows_with_reduction():
     fixed = np.zeros(len(vertices), dtype=bool)
 
     errors = [
-        fabriks.QuadricSimplifier().simplify(vertices, faces, fixed=fixed, target_faces=len(faces) // ratio).error
+        fabriks.QuadricSimplifier()
+        .simplify(vertices, faces, fixed=fixed, target_faces=len(faces) // ratio)
+        .error
         for ratio in (2, 4, 8, 16)
     ]
 
@@ -227,7 +241,9 @@ def test_the_boundary_check_notices_a_boundary_that_did_not_hold():
 
     # Drop every vertex sharing the first boundary position, so the position is truly gone.
     missing = ~(vertices == vertices[boundary[0]]).all(axis=1)
-    assert not boundary_held(vertices, faces, vertices[missing]), "a vanished boundary vertex is a gap"
+    assert not boundary_held(vertices, faces, vertices[missing]), (
+        "a vanished boundary vertex is a gap"
+    )
 
     # And a wholesale shift of the boundary, which is the crack this exists to catch.
     shifted = vertices.copy()
@@ -244,10 +260,14 @@ def test_a_name_selects_a_backend_and_the_default_is_the_quadric_one():
     """`simplification` is a value out of a vocabulary, the way `codec` is."""
     assert isinstance(simplifier_for(fabriks.SIMPLIFICATION_QUADRIC), fabriks.QuadricSimplifier)
     assert isinstance(simplifier_for(fabriks.SIMPLIFICATION_GREEDY), fabriks.GreedyEdgeCollapse)
-    assert isinstance(resolve_simplifier(None), fabriks.QuadricSimplifier), "the default is the quadric collapse"
+    assert isinstance(resolve_simplifier(None), fabriks.QuadricSimplifier), (
+        "the default is the quadric collapse"
+    )
 
     # A fresh instance each time, so one caller's adjustment is not everyone's.
-    assert simplifier_for(fabriks.SIMPLIFICATION_GREEDY) is not simplifier_for(fabriks.SIMPLIFICATION_GREEDY)
+    assert simplifier_for(fabriks.SIMPLIFICATION_GREEDY) is not simplifier_for(
+        fabriks.SIMPLIFICATION_GREEDY
+    )
 
 
 def test_a_backend_this_package_does_not_ship_is_refused_by_name():
@@ -296,9 +316,14 @@ def test_a_collection_built_with_either_backend_holds_the_same_invariants(name: 
     fabriks.write_collection(collection, store, "c")
     opened = fabriks.open_collection(store, "c")
 
-    faces = {level: sum(shard.column("index_count").to_pylist()) // 3 for level, shard in collection.shards}
+    faces = {
+        level: sum(shard.column("index_count").to_pylist()) // 3
+        for level, shard in collection.shards
+    }
     for level in (1, 2):
-        assert faces[level] <= faces[level - 1], "a coarse level holds more geometry than the level below"
+        assert faces[level] <= faces[level - 1], (
+            "a coarse level holds more geometry than the level below"
+        )
 
     for object_id in opened.objects:
         for level in range(3):

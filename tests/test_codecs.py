@@ -24,9 +24,16 @@ def test_positions_round_trip_within_a_quantum(compression: str):
     rng = np.random.default_rng(0)
     vertices = origin + rng.random((64, 3)) * extent
 
-    blob = fabriks.encode_positions(vertices, cell=cell, level=0, cell_size=cell_size, compression=compression)
+    blob = fabriks.encode_positions(
+        vertices, cell=cell, level=0, cell_size=cell_size, compression=compression
+    )
     decoded = fabriks.decode_positions(
-        blob, cell=cell, level=0, cell_size=cell_size, compression=compression, vertex_count=len(vertices)
+        blob,
+        cell=cell,
+        level=0,
+        cell_size=cell_size,
+        compression=compression,
+        vertex_count=len(vertices),
     )
 
     quantum = extent / QUANT_MAX
@@ -39,7 +46,9 @@ def test_an_uncompressed_positions_blob_is_six_bytes_per_vertex():
     origin, _ = cell_box(0, 0, cell_size)
     vertices = origin + np.array([[0.0, 0.0, 0.0], [128.0, 128.0, 64.0]])
 
-    blob = fabriks.encode_positions(vertices, cell=0, level=0, cell_size=cell_size, compression=fabriks.COMPRESSION_NONE)
+    blob = fabriks.encode_positions(
+        vertices, cell=0, level=0, cell_size=cell_size, compression=fabriks.COMPRESSION_NONE
+    )
 
     assert len(blob) == 6 * len(vertices)
     assert np.frombuffer(blob, dtype="<u2").tolist() == [0, 0, 0, QUANT_MAX, QUANT_MAX, QUANT_MAX]
@@ -53,14 +62,22 @@ def test_a_vertex_outside_its_cell_is_refused_rather_than_clamped():
     """
     with pytest.raises(fabriks.PartitioningError, match="partitioning bug, not a"):
         fabriks.encode_positions(
-            np.array([[200.0, 10.0, 10.0]]), cell=0, level=0, cell_size=(128, 128, 64), compression=fabriks.COMPRESSION_NONE
+            np.array([[200.0, 10.0, 10.0]]),
+            cell=0,
+            level=0,
+            cell_size=(128, 128, 64),
+            compression=fabriks.COMPRESSION_NONE,
         )
 
 
 def test_a_boundary_vertex_is_not_mistaken_for_a_stray_one():
     """A vertex exactly on the far face quantizes to 65535, and must not trip the check."""
     blob = fabriks.encode_positions(
-        np.array([[128.0, 128.0, 64.0]]), cell=0, level=0, cell_size=(128, 128, 64), compression=fabriks.COMPRESSION_NONE
+        np.array([[128.0, 128.0, 64.0]]),
+        cell=0,
+        level=0,
+        cell_size=(128, 128, 64),
+        compression=fabriks.COMPRESSION_NONE,
     )
     assert np.frombuffer(blob, dtype="<u2").tolist() == [QUANT_MAX, QUANT_MAX, QUANT_MAX]
 
@@ -84,7 +101,9 @@ def test_indices_round_trip_as_the_same_triangles(compression: str):
 def test_decoding_meshopt_without_a_count_is_refused():
     """The encoded buffer carries no length, which is why the geometry row has the column."""
     with pytest.raises(ValueError, match="`vertex_count` is required"):
-        fabriks.decode_positions(b"", cell=0, level=0, cell_size=(128, 128, 64), compression=fabriks.COMPRESSION_ZSTD)
+        fabriks.decode_positions(
+            b"", cell=0, level=0, cell_size=(128, 128, 64), compression=fabriks.COMPRESSION_ZSTD
+        )
     with pytest.raises(ValueError, match="`index_count` is required"):
         fabriks.decode_indices(b"", compression=fabriks.COMPRESSION_ZSTD)
 

@@ -18,7 +18,9 @@ import fabriks
 from tests.conftest import CELL_SIZE, LEVELS
 
 
-def test_geometry_round_trips_through_an_anisotropic_grid(collection: fabriks.MeshCollection, objects: dict):
+def test_geometry_round_trips_through_an_anisotropic_grid(
+    collection: fabriks.MeshCollection, objects: dict
+):
     """Decoded vertices land where the source vertices were, with a non-cubic cell.
 
     If ``cell_size`` were used in the wrong component order anywhere -- when quantizing, when
@@ -39,7 +41,9 @@ def test_geometry_round_trips_through_an_anisotropic_grid(collection: fabriks.Me
         assert np.asarray(decoded.bounds[1]) == pytest.approx(source_high, abs=quantum.max() * 2)
 
 
-def test_a_cell_addresses_the_box_its_geometry_actually_occupies(collection: fabriks.MeshCollection):
+def test_a_cell_addresses_the_box_its_geometry_actually_occupies(
+    collection: fabriks.MeshCollection,
+):
     """Every vertex lies inside the box its cell's Morton code names, at every level.
 
     This is the property the server's one-sided ``cellSize`` cross-check leans on: geometry
@@ -53,29 +57,44 @@ def test_a_cell_addresses_the_box_its_geometry_actually_occupies(collection: fab
     for entry in opened.cells.values():
         origin, extent = opened.cell_box(entry.level, entry.cell)
         cell = opened.read_cell(entry.level, entry.cell)
-        assert (cell.vertices >= origin - 1e-6).all(), f"cell {entry.cell} at level {entry.level} spills low"
-        assert (cell.vertices <= origin + extent + 1e-6).all(), f"cell {entry.cell} at level {entry.level} spills high"
+        assert (cell.vertices >= origin - 1e-6).all(), (
+            f"cell {entry.cell} at level {entry.level} spills low"
+        )
+        assert (cell.vertices <= origin + extent + 1e-6).all(), (
+            f"cell {entry.cell} at level {entry.level} spills high"
+        )
 
 
-def test_the_manifest_makes_no_claim_about_what_the_components_mean():
-    """fabriks computes in positional (x, y, z) and states nothing about which axis a slot is.
+def test_the_manifest_carries_the_shape_and_the_axes_it_was_told():
+    """A collection states the voxel extent it was built over, and names the axes if it knows them.
 
-    Naming those axes is a statement about how the collection relates to whatever it came from,
-    which belongs to the layer that owns the coordinate system -- not to a mesh serializer. A
-    key here would be a claim nothing in the format could check, use or contradict.
+    ``shape`` is measured from the geometry, so it is always present. ``axes`` is what the
+    caller declared about the coordinate system the objects came from: without a declaration
+    the key is still written, as ``null``, so a reader never has to guess whether the format
+    knows the concept.
     """
     objects = {1: trimesh.creation.icosphere(radius=20.0).apply_translation([64.0, 64.0, 32.0])}
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        built = fabriks.build_collection(objects, cell_size=(128, 128, 64), levels=2)
+        unnamed = fabriks.build_collection(objects, cell_size=(128, 128, 64), levels=2)
+        named = fabriks.build_collection(
+            objects, cell_size=(128, 128, 64), levels=2, axes=("z", "y", "x")
+        )
 
-    written = built.manifest.to_dict()
-    assert set(written) == {"specVersion", "grid", "encoding", "counts", "files"}
-    assert "axes" not in written
+    written = unnamed.manifest.to_dict()
+    assert set(written) == {"specVersion", "grid", "encoding", "counts", "files", "shape", "axes"}
+    assert written["axes"] is None
+    assert len(written["shape"]) == 3
+    assert all(isinstance(size, int) and size > 0 for size in written["shape"])
+
+    assert named.manifest.to_dict()["axes"] == ["z", "y", "x"]
+    assert named.manifest.to_dict()["shape"] == written["shape"]
 
 
-def test_the_encoding_always_states_the_keys_a_decoder_cannot_infer(collection: fabriks.MeshCollection):
+def test_the_encoding_always_states_the_keys_a_decoder_cannot_infer(
+    collection: fabriks.MeshCollection,
+):
     """``codec``, ``compression`` and ``indices`` are never omitted or defaulted downstream.
 
     A wrong value here is not an error at any layer -- it is geometry that decodes to garbage --
@@ -95,12 +114,16 @@ def test_the_declared_codec_is_the_one_that_was_applied():
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        raw = fabriks.build_collection(objects, cell_size=(128, 128, 64), levels=2, codec=fabriks.CODEC_NONE)
+        raw = fabriks.build_collection(
+            objects, cell_size=(128, 128, 64), levels=2, codec=fabriks.CODEC_NONE
+        )
 
     assert raw.manifest.encoding.codec == fabriks.CODEC_NONE
     row = raw.shards[0][1]
     positions = row.column("positions")[0].as_py()
-    assert len(positions) == 6 * row.column("vertex_count")[0].as_py(), "NONE must write the blob raw"
+    assert len(positions) == 6 * row.column("vertex_count")[0].as_py(), (
+        "NONE must write the blob raw"
+    )
 
 
 def test_object_ids_and_ordinals_follow_the_format(collection: fabriks.MeshCollection):
@@ -119,7 +142,9 @@ def test_object_ids_and_ordinals_follow_the_format(collection: fabriks.MeshColle
             assert shard.column("object_ordinals")[row].as_py() == [ids.index(i) for i in row_ids]
 
 
-def test_object_offsets_are_ascending_starts_into_the_concatenated_arrays(collection: fabriks.MeshCollection):
+def test_object_offsets_are_ascending_starts_into_the_concatenated_arrays(
+    collection: fabriks.MeshCollection,
+):
     """The offsets are what make a cell decodable into per-object meshes."""
     for _, shard in collection.shards:
         for row in range(shard.num_rows):
@@ -130,7 +155,9 @@ def test_object_offsets_are_ascending_starts_into_the_concatenated_arrays(collec
             assert vertex_offsets == sorted(vertex_offsets)
             assert index_offsets == sorted(index_offsets)
             assert vertex_offsets[-1] < shard.column("vertex_count")[row].as_py()
-            assert all(offset % 3 == 0 for offset in index_offsets), "an index offset lands on a triangle"
+            assert all(offset % 3 == 0 for offset in index_offsets), (
+                "an index offset lands on a triangle"
+            )
 
 
 def test_the_child_mask_names_the_children_that_exist(collection: fabriks.MeshCollection):
@@ -144,7 +171,9 @@ def test_the_child_mask_names_the_children_that_exist(collection: fabriks.MeshCo
             assert entry.child_mask == 0, "the finest level has no children"
             continue
         for key in entry.children():
-            assert key in opened.cells, f"cell {entry.cell} claims a child {key} that does not exist"
+            assert key in opened.cells, (
+                f"cell {entry.cell} claims a child {key} that does not exist"
+            )
 
         actual = {key for key in opened.cells if key[0] == entry.level - 1}
         claimed = set(entry.children())
@@ -161,13 +190,19 @@ def _is_child(cell: int, parent: fabriks.CellEntry) -> bool:
 def test_every_level_holds_every_object(collection: fabriks.MeshCollection):
     """A level is a standalone representation, not a delta on a finer one."""
     per_level = {
-        level: {object_id for row in range(shard.num_rows) for object_id in shard.column("object_ids")[row].as_py()}
+        level: {
+            object_id
+            for row in range(shard.num_rows)
+            for object_id in shard.column("object_ids")[row].as_py()
+        }
         for level, shard in collection.shards
     }
     expected = set(collection.object_catalog.column("object_id").to_pylist())
 
     for level in range(LEVELS):
-        assert per_level[level] == expected, f"level {level} is missing objects the collection declares"
+        assert per_level[level] == expected, (
+            f"level {level} is missing objects the collection declares"
+        )
 
 
 def test_every_coarse_level_saves_something_real(collection: fabriks.MeshCollection):
@@ -189,7 +224,9 @@ def test_every_coarse_level_saves_something_real(collection: fabriks.MeshCollect
         )
 
 
-def test_a_coarse_level_never_holds_more_geometry_than_the_level_below(collection: fabriks.MeshCollection):
+def test_a_coarse_level_never_holds_more_geometry_than_the_level_below(
+    collection: fabriks.MeshCollection,
+):
     """A coarser level summarises a finer one, so it cannot cost more than what it summarises.
 
     Worth stating as its own invariant because the way it breaks is not an error: a decimator
@@ -197,10 +234,15 @@ def test_a_coarse_level_never_holds_more_geometry_than_the_level_below(collectio
     surface whole, produces a perfectly valid collection whose level 2 is *larger* than its
     level 1 -- a coarse fetch that downloads more and draws worse.
     """
-    faces = {level: sum(shard.column("index_count").to_pylist()) // 3 for level, shard in collection.shards}
+    faces = {
+        level: sum(shard.column("index_count").to_pylist()) // 3
+        for level, shard in collection.shards
+    }
 
     for level in range(1, LEVELS):
-        assert faces[level] <= faces[level - 1], f"level {level} holds more geometry than level {level - 1}"
+        assert faces[level] <= faces[level - 1], (
+            f"level {level} holds more geometry than level {level - 1}"
+        )
 
 
 def test_a_missed_quarter_budget_is_warned_about():
@@ -210,7 +252,11 @@ def test_a_missed_quarter_budget_is_warned_about():
     cut vertex is pinned by ``boundary: LOCKED`` and the decimator may not spend it, so
     ``QUARTER`` stalls at about half however many levels are asked for.
     """
-    objects = {1: trimesh.creation.icosphere(radius=40.0, subdivisions=3).apply_translation([80.0, 80.0, 80.0])}
+    objects = {
+        1: trimesh.creation.icosphere(radius=40.0, subdivisions=3).apply_translation(
+            [80.0, 80.0, 80.0]
+        )
+    }
 
     with pytest.warns(UserWarning, match="decimation: QUARTER"):
         fabriks.build_collection(objects, cell_size=(4, 4, 4), levels=2)
@@ -218,11 +264,15 @@ def test_a_missed_quarter_budget_is_warned_about():
 
 def test_choosing_a_cell_size_beats_a_cell_smaller_than_the_objects(objects: dict):
     """The heuristic's job is avoiding the choice that goes wrong silently."""
-    chosen = fabriks.choose_cell_size({key: fabriks.coerce_mesh(value) for key, value in objects.items()})
+    chosen = fabriks.choose_cell_size(
+        {key: fabriks.coerce_mesh(value) for key, value in objects.items()}
+    )
 
     assert len(chosen) == 3
     assert all(size >= 8 for size in chosen)
-    assert all(size & (size - 1) == 0 for size in chosen), "powers of two keep coarse planes a subset of fine ones"
+    assert all(size & (size - 1) == 0 for size in chosen), (
+        "powers of two keep coarse planes a subset of fine ones"
+    )
 
 
 def test_raw_vertex_and_face_arrays_are_accepted_without_trimesh_in_the_caller(objects: dict):
@@ -255,7 +305,9 @@ def test_lod_error_is_per_cell_rather_than_per_level(collection: fabriks.MeshCol
     """
     catalog = collection.cell_catalog
     per_level: dict[int, list[float]] = {}
-    for level, error in zip(catalog.column("level").to_pylist(), catalog.column("lod_error").to_pylist()):
+    for level, error in zip(
+        catalog.column("level").to_pylist(), catalog.column("lod_error").to_pylist()
+    ):
         per_level.setdefault(int(level), []).append(round(float(error), 9))
 
     # Level 0 is uniform by construction -- nothing is decimated there, so its error is the
@@ -270,7 +322,9 @@ def test_lod_error_is_per_cell_rather_than_per_level(collection: fabriks.MeshCol
             f"which is what a per-level maximum looks like"
         )
 
-    assert checked, "this fixture has no coarse level holding more than one cell, so it proves nothing"
+    assert checked, (
+        "this fixture has no coarse level holding more than one cell, so it proves nothing"
+    )
 
 
 def test_a_parents_error_dominates_its_childrens(collection: fabriks.MeshCollection):
@@ -359,19 +413,25 @@ def test_the_component_order_is_the_callers_and_fabriks_never_interprets_it():
     fixed by the Parquet schema a server checks -- not a claim about which physical axis each
     one is. The format makes no such claim anywhere.
     """
-    source = trimesh.creation.box(extents=[300.0, 170.0, 90.0]).apply_translation([260.0, 210.0, 95.0])
+    source = trimesh.creation.box(extents=[300.0, 170.0, 90.0]).apply_translation(
+        [260.0, 210.0, 95.0]
+    )
     vertices = np.asarray(source.vertices)
     faces = np.asarray(source.faces)
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        forward = fabriks.build_collection({7: (vertices, faces)}, cell_size=(128, 128, 64), levels=3)
+        forward = fabriks.build_collection(
+            {7: (vertices, faces)}, cell_size=(128, 128, 64), levels=3
+        )
         # The same scene in the reverse order: components reversed, cell size reversed with them.
         reversed_ = fabriks.build_collection(
             {7: (vertices[:, ::-1], faces)}, cell_size=(64, 128, 128), levels=3
         )
 
-    assert [shard.num_rows for _, shard in forward.shards] == [shard.num_rows for _, shard in reversed_.shards], (
+    assert [shard.num_rows for _, shard in forward.shards] == [
+        shard.num_rows for _, shard in reversed_.shards
+    ], (
         "the octree partition differs between component orders, so something reads position as meaning"
     )
 
@@ -381,8 +441,12 @@ def test_the_component_order_is_the_callers_and_fabriks_never_interprets_it():
 
     # Reversed back, it is the original scene -- to within a quantum of the finest cell.
     quantum = max(64, 128, 128) / fabriks.QUANT_MAX
-    assert np.asarray(decoded.bounds[0])[::-1] == pytest.approx(np.asarray(source.bounds[0]), abs=quantum * 4)
-    assert np.asarray(decoded.bounds[1])[::-1] == pytest.approx(np.asarray(source.bounds[1]), abs=quantum * 4)
+    assert np.asarray(decoded.bounds[0])[::-1] == pytest.approx(
+        np.asarray(source.bounds[0]), abs=quantum * 4
+    )
+    assert np.asarray(decoded.bounds[1])[::-1] == pytest.approx(
+        np.asarray(source.bounds[1]), abs=quantum * 4
+    )
 
 
 def test_the_component_order_changes_the_partition_and_never_the_geometry():
@@ -399,7 +463,9 @@ def test_the_component_order_changes_the_partition_and_never_the_geometry():
     states nothing about it rather than inventing a claim.
     """
     # Tall in the third component, narrow in the first: an order mistake cannot go unnoticed.
-    source = trimesh.creation.box(extents=[40.0, 40.0, 400.0]).apply_translation([60.0, 60.0, 260.0])
+    source = trimesh.creation.box(extents=[40.0, 40.0, 400.0]).apply_translation(
+        [60.0, 60.0, 260.0]
+    )
     objects = {1: (np.asarray(source.vertices), np.asarray(source.faces))}
 
     decoded = {}
@@ -409,7 +475,10 @@ def test_the_component_order_changes_the_partition_and_never_the_geometry():
             collection = fabriks.build_collection(objects, cell_size=cell_size, levels=1)
         store = fabriks.MemoryStore()
         fabriks.write_collection(collection, store, "c")
-        decoded[label] = (collection.shards[0][1].num_rows, fabriks.open_collection(store, "c").object_mesh(1))
+        decoded[label] = (
+            collection.shards[0][1].num_rows,
+            fabriks.open_collection(store, "c").object_mesh(1),
+        )
 
     assert decoded["matched"][0] != decoded["reversed"][0], (
         "an anisotropic cell size read in the wrong order should partition differently"

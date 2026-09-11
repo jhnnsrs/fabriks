@@ -44,7 +44,9 @@ def test_the_manifest_is_written_last(collection: fabriks.MeshCollection):
     assert len(store.order) == len(set(store.order)), "nothing was written twice"
 
 
-def test_everything_the_manifest_names_exists_before_the_manifest_does(collection: fabriks.MeshCollection):
+def test_everything_the_manifest_names_exists_before_the_manifest_does(
+    collection: fabriks.MeshCollection,
+):
     """The manifest is a promise about the tree, so the tree has to be there first."""
     store = RecordingStore()
 
@@ -56,7 +58,9 @@ def test_everything_the_manifest_names_exists_before_the_manifest_does(collectio
 
     written_before_manifest = set(store.order[:-1])
     for path in named:
-        assert f"c/{path}" in written_before_manifest, f"the manifest names {path}, which was not written before it"
+        assert f"c/{path}" in written_before_manifest, (
+            f"the manifest names {path}, which was not written before it"
+        )
 
 
 def test_an_interrupted_write_leaves_a_prefix_that_is_refused(collection: fabriks.MeshCollection):
@@ -69,7 +73,9 @@ def test_an_interrupted_write_leaves_a_prefix_that_is_refused(collection: fabrik
         fabriks.open_collection(store, "c")
 
 
-def test_the_written_manifest_names_the_parts_that_actually_landed(collection: fabriks.MeshCollection):
+def test_the_written_manifest_names_the_parts_that_actually_landed(
+    collection: fabriks.MeshCollection,
+):
     """A reader that cannot list a prefix -- an HTTP store -- still has to find every level."""
     store = fabriks.MemoryStore()
 
@@ -87,7 +93,9 @@ def test_the_written_manifest_names_the_parts_that_actually_landed(collection: f
             assert entry.row_groups and entry.row_groups >= 1
 
 
-def test_a_large_level_is_split_across_parts_and_still_reads_as_one(collection: fabriks.MeshCollection):
+def test_a_large_level_is_split_across_parts_and_still_reads_as_one(
+    collection: fabriks.MeshCollection,
+):
     """A level is a directory precisely so this can happen without the layout changing shape."""
     store = fabriks.MemoryStore()
 
@@ -99,7 +107,9 @@ def test_a_large_level_is_split_across_parts_and_still_reads_as_one(collection: 
     assert paths == sorted(paths), "parts are numbered in order"
 
     opened = fabriks.open_collection(store, "c")
-    assert opened.geometry(0).num_rows == collection.shards[0][1].num_rows, "the parts read back as one level"
+    assert opened.geometry(0).num_rows == collection.shards[0][1].num_rows, (
+        "the parts read back as one level"
+    )
 
 
 def test_the_levels_written_are_contiguous_from_zero(collection: fabriks.MeshCollection):
@@ -117,7 +127,9 @@ def test_the_levels_written_are_contiguous_from_zero(collection: fabriks.MeshCol
     assert levels == list(range(manifest.grid.levels))
 
 
-def test_a_cell_never_spans_more_than_its_declared_cell_size_allows(collection: fabriks.MeshCollection):
+def test_a_cell_never_spans_more_than_its_declared_cell_size_allows(
+    collection: fabriks.MeshCollection,
+):
     """A cell's geometry lives inside its address box, which is what makes ``cell_size`` checkable.
 
     Positions are quantized to exactly that box, so an observed extent larger than
@@ -157,7 +169,9 @@ def test_the_declared_index_width_is_the_one_the_blobs_use():
     shard = raw.shards[0][1]
     for row in range(shard.num_rows):
         blob = shard.column("indices")[row].as_py()
-        assert len(blob) == 4 * shard.column("index_count")[row].as_py(), "four bytes per index is UINT32"
+        assert len(blob) == 4 * shard.column("index_count")[row].as_py(), (
+            "four bytes per index is UINT32"
+        )
 
 
 def test_a_frame_missing_a_required_column_is_refused_before_any_write():

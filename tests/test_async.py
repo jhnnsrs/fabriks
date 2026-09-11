@@ -116,7 +116,9 @@ def test_the_async_reader_returns_exactly_what_the_sync_one_does(served: Concurr
 
     got = asyncio.run(_read(served, keys))
 
-    assert [(cell.level, cell.cell) for cell in got] == keys, "the caller's order is the answer's order"
+    assert [(cell.level, cell.cell) for cell in got] == keys, (
+        "the caller's order is the answer's order"
+    )
     for actual, wanted in zip(got, expected):
         assert np.array_equal(actual.vertices, wanted.vertices)
         assert np.array_equal(actual.faces, wanted.faces)

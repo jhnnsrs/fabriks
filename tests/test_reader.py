@@ -33,7 +33,9 @@ def test_opening_reads_the_manifest_and_nothing_else(written: fabriks.MemoryStor
     assert store.reads == ["collection/fabriks.json", "collection/catalog/cells.parquet"]
 
 
-def test_the_declarations_survive_the_round_trip(collection: fabriks.MeshCollection, opened: fabriks.Collection):
+def test_the_declarations_survive_the_round_trip(
+    collection: fabriks.MeshCollection, opened: fabriks.Collection
+):
     """What the writer declared is what a renderer configures its decoder from."""
     assert opened.manifest.spec_version == fabriks.SPEC_VERSION
     assert opened.grid.cell_size == CELL_SIZE
@@ -71,8 +73,12 @@ def test_a_cells_bounds_match_the_geometry_it_holds(opened: fabriks.Collection):
         cell = opened.read_cell(entry.level, entry.cell)
         quantum = max(opened.grid.cell_extent(entry.level)) / fabriks.QUANT_MAX
 
-        assert cell.vertices.min(axis=0) == pytest.approx(np.asarray(entry.bbox_min), abs=quantum * 2)
-        assert cell.vertices.max(axis=0) == pytest.approx(np.asarray(entry.bbox_max), abs=quantum * 2)
+        assert cell.vertices.min(axis=0) == pytest.approx(
+            np.asarray(entry.bbox_min), abs=quantum * 2
+        )
+        assert cell.vertices.max(axis=0) == pytest.approx(
+            np.asarray(entry.bbox_max), abs=quantum * 2
+        )
 
 
 def test_one_object_can_be_isolated_out_of_a_shared_cell(opened: fabriks.Collection):
@@ -89,7 +95,9 @@ def test_one_object_can_be_isolated_out_of_a_shared_cell(opened: fabriks.Collect
         piece = cell.object_mesh(object_id)
         total += len(piece.faces)
         assert piece.faces.min() >= 0, "an isolated object's indices were not re-based"
-        assert piece.faces.max() < len(piece.vertices), "an isolated object's index points outside its vertices"
+        assert piece.faces.max() < len(piece.vertices), (
+            "an isolated object's index points outside its vertices"
+        )
 
     assert total == len(cell.faces), "the objects' faces do not add up to the cell's"
 
@@ -110,18 +118,26 @@ def test_the_object_catalog_answers_where_an_object_is(opened: fabriks.Collectio
     for object_id, entry in opened.objects.items():
         assert entry.cells, f"object {object_id} is in the catalog but names no cells"
         for level, cell in entry.cells:
-            assert (level, cell) in opened.cells, "the object catalog names a cell the cell catalog does not have"
+            assert (level, cell) in opened.cells, (
+                "the object catalog names a cell the cell catalog does not have"
+            )
         assert entry.cells_at(0), f"object {object_id} has no level-0 cells"
 
 
-def test_an_object_is_reassembled_across_the_cells_that_hold_it(opened: fabriks.Collection, objects: dict):
+def test_an_object_is_reassembled_across_the_cells_that_hold_it(
+    opened: fabriks.Collection, objects: dict
+):
     """The end-to-end form: lookup, one fetch per named cell, then weld."""
     for object_id, source in objects.items():
         reassembled = opened.object_mesh(object_id, level=0)
         quantum = max(CELL_SIZE) / fabriks.QUANT_MAX
 
-        assert np.asarray(reassembled.bounds[0]) == pytest.approx(np.asarray(source.bounds[0]), abs=quantum * 4)
-        assert np.asarray(reassembled.bounds[1]) == pytest.approx(np.asarray(source.bounds[1]), abs=quantum * 4)
+        assert np.asarray(reassembled.bounds[0]) == pytest.approx(
+            np.asarray(source.bounds[0]), abs=quantum * 4
+        )
+        assert np.asarray(reassembled.bounds[1]) == pytest.approx(
+            np.asarray(source.bounds[1]), abs=quantum * 4
+        )
         assert len(reassembled.faces) > 0
 
 
@@ -197,7 +213,9 @@ def test_a_level_is_found_by_listing_when_the_manifest_does_not_name_its_parts(
 
     opened = fabriks.open_collection(store, "collection")
 
-    assert opened.level_paths(0) == ["level0/part-00000.parquet"], "the listing was not made relative again"
+    assert opened.level_paths(0) == ["level0/part-00000.parquet"], (
+        "the listing was not made relative again"
+    )
     assert opened.geometry(0).num_rows == collection.shards[0][1].num_rows
 
     entry = opened.cells_at(0)[0]

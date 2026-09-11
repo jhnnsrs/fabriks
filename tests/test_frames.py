@@ -13,7 +13,9 @@ def test_every_role_declares_the_columns_the_format_requires():
     schemas = arrow_schemas()
 
     for role, required in fabriks.REQUIRED_COLUMNS.items():
-        assert set(required) <= set(schemas[role].names), f"the {role} schema omits a required column"
+        assert set(required) <= set(schemas[role].names), (
+            f"the {role} schema omits a required column"
+        )
 
 
 def test_the_column_types_are_the_ones_a_describe_would_print():
