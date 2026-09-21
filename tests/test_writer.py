@@ -215,3 +215,24 @@ def test_writing_twice_replaces_rather_than_accumulates(collection: fabriks.Mesh
     fabriks.write_collection(collection, store, "c")
 
     assert store.objects.keys() == first.keys()
+
+
+def test_the_parquet_codec_is_the_callers_and_reaches_every_file(collection: fabriks.MeshCollection):
+    """A reader that lacks a decoder would draw nothing, so the codec is stated, not inherited."""
+    import io
+
+    import pyarrow.parquet as pq
+
+    store = fabriks.MemoryStore()
+    fabriks.write_collection(collection, store, "c", parquet_compression="snappy")
+
+    parts = [path for path in store.objects if path.endswith(".parquet")]
+    assert parts
+    for path in parts:
+        metadata = pq.ParquetFile(io.BytesIO(store.objects[path])).metadata
+        codecs = {
+            metadata.row_group(group).column(column).compression
+            for group in range(metadata.num_row_groups)
+            for column in range(metadata.num_columns)
+        }
+        assert codecs == {"SNAPPY"}, path
