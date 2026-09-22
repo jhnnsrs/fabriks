@@ -114,7 +114,7 @@ def build_table(rows: Sequence[Mapping[str, Any]], schema: pa.Schema) -> pa.Tabl
     return pa.table(columns, schema=schema)
 
 
-def validate_columns(table: Any, role: str) -> None:  # noqa: ANN401
+def validate_columns(table: pa.Table, role: str) -> None:
     """Refuse a frame missing a column its role requires, before an upload is spent on it.
 
     The earliest point the mistake is catchable and the only point it is cheap.

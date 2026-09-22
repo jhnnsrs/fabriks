@@ -20,10 +20,10 @@ forty row groups, not the levels they came from.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Awaitable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from functools import cached_property
-from typing import IO, TYPE_CHECKING, Any, cast
+from typing import IO, TYPE_CHECKING, Any, TypeVar, cast
 
 import numpy as np
 import numpy.typing as npt
@@ -31,6 +31,7 @@ import numpy.typing as npt
 from fabriks.codecs import decode_indices, decode_positions
 from fabriks.errors import FormatError, UnfinishedCollectionError
 from fabriks.frames import parquet_to_table
+from fabriks.geometry import concatenate_and_weld
 from fabriks.manifest import (
     CELL_CATALOG_PATH,
     MANIFEST_NAME,
@@ -41,7 +42,8 @@ from fabriks.manifest import (
     Manifest,
     level_prefix,
 )
-from fabriks.octree import cell_box, morton_decode
+from fabriks.octree import cell_box, morton_decode, morton_encode_one
+from fabriks.planner import plan_cells
 from fabriks.sources import Mesh
 from fabriks.stores import (
     FabriksStore,
@@ -53,8 +55,12 @@ from fabriks.stores import (
     list_paths,
 )
 
+#: What one prefetch coroutine resolves to.
+_Awaited = TypeVar("_Awaited")
+
 if TYPE_CHECKING:  # pragma: no cover - typing only
     import pyarrow as pa
+    import pyarrow.parquet as pq
 
 
 def _optional_int(column: Sequence[Any], row: int) -> int | None:
@@ -78,7 +84,9 @@ def _optional_str(column: Sequence[Any], row: int) -> str | None:
     return None if value is None else str(value)
 
 
-def _present(columns: Mapping[str, Sequence[Any]], name: str, row: int) -> Any:  # noqa: ANN401
+def _present(
+    columns: Mapping[str, Sequence[Any]], name: str, row: int
+) -> Any:  # noqa: ANN401 -- one cell of a caller-declared parquet column
     """One value out of a column the format declares non-null, or a refusal naming it.
 
     Every catalog column but ``part``/``row_group``/``blob_bytes`` is non-null in the schema a
@@ -105,14 +113,16 @@ def _float(columns: Mapping[str, Sequence[Any]], name: str, row: int) -> float:
     return float(_present(columns, name, row))
 
 
-def _buffer(body: bytes) -> Any:  # noqa: ANN401
+def _buffer(body: bytes) -> pa.BufferReader:
     """An in-memory random-access file, for a part whose length nothing recorded."""
     import pyarrow as pa
 
     return pa.BufferReader(body)
 
 
-def _row_group_span(metadata: Any, row_group: int) -> tuple[int, int] | None:  # noqa: ANN401
+def _row_group_span(
+    metadata: pq.FileMetaData, row_group: int
+) -> tuple[int, int] | None:
     """The ``(start, length)`` of every byte one row group occupies in its part.
 
     A row group's column chunks are written consecutively, so the span from the first chunk's
@@ -130,7 +140,12 @@ def _row_group_span(metadata: Any, row_group: int) -> tuple[int, int] | None:  #
     ends: list[int] = []
     for index in range(group.num_columns):
         column = group.column(index)
-        start = column.dictionary_page_offset or column.data_page_offset
+        # pyarrow-stubs types `data_page_offset` as a plain int, but a malformed footer can
+        # carry no offset at all -- the same case the `except Exception` above exists for -- so
+        # the runtime guard stays and the optimistic stub is widened to match it.
+        start = cast(
+            "int | None", column.dictionary_page_offset or column.data_page_offset
+        )
         if start is None:
             return None
         starts.append(int(start))
@@ -178,8 +193,6 @@ class CellEntry:
         Read straight off ``child_mask``, so descending the octree costs no listing and no
         catalog scan.
         """
-        from fabriks.octree import morton_encode_one
-
         if self.level == 0 or not self.child_mask:
             return []
         i, j, k = self.triple
@@ -513,7 +526,7 @@ class Collection:
         """The paths of the parts holding one level."""
         return [entry.path for entry in self.level_files(level)]
 
-    def _parquet_file(self, level: int, part: int) -> Any:  # noqa: ANN401
+    def _parquet_file(self, level: int, part: int) -> pq.ParquetFile:
         """A ``ParquetFile`` over one part, reading through the store rather than into memory."""
         import pyarrow.parquet as pq
 
@@ -653,8 +666,6 @@ class Collection:
         The end-to-end form of what the object catalog is for: a lookup, then one fetch per
         cell it names, never a scan.
         """
-        from fabriks.geometry import concatenate_and_weld
-
         pieces = []
         for entry in sorted(self.cells_for_object(object_id, level=level), key=lambda item: item.cell):
             piece = self.read_cell(entry.level, entry.cell).object_mesh(object_id)
@@ -695,7 +706,7 @@ class Collection:
 
         gate = asyncio.Semaphore(max(1, int(concurrency)))
 
-        async def guarded(coroutine: Any) -> Any:  # noqa: ANN401
+        async def guarded(coroutine: Awaitable[_Awaited]) -> _Awaited:
             async with gate:
                 return await coroutine
 
@@ -786,8 +797,6 @@ class Collection:
 
     def plan(self, **kwargs: Any) -> list[CellEntry]:  # noqa: ANN401
         """Choose which cells to draw at which level. See :func:`fabriks.plan_cells`."""
-        from fabriks.planner import plan_cells
-
         return plan_cells(self, **kwargs)
 
 
