@@ -52,7 +52,7 @@ def collection(objects: dict[int, Any]) -> fabriks.MeshCollection:
     """A built collection, shared across the suite because building it is the slow part."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")  # the QUARTER warning is asserted on where it matters
-        return fabriks.build_collection(objects, cell_size=CELL_SIZE, levels=LEVELS)
+        return fabriks.build_collection(objects, cell_size=CELL_SIZE, levels=LEVELS, axes=("x", "y", "z"))
 
 
 @pytest.fixture(scope="session")

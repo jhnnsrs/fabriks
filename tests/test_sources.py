@@ -93,7 +93,7 @@ def test_object_ids_are_normalised_to_ints():
 def test_an_empty_collection_is_refused():
     """There is nothing to choose a cell size from and nothing to write."""
     with pytest.raises(fabriks.FormatError, match="at least one object"):
-        fabriks.build_collection({}, cell_size=(64, 64, 64))
+        fabriks.build_collection({}, cell_size=(64, 64, 64), axes=("x", "y", "z"))
 
 
 def test_choosing_a_cell_size_for_nothing_is_refused():
@@ -109,6 +109,7 @@ def test_an_unknown_codec_is_refused_before_the_expensive_work():
             {1: (np.zeros((3, 3)), np.array([[0, 1, 2]]))},
             cell_size=(64, 64, 64),
             codec="DRACO",
+            axes=("x", "y", "z"),
         )
 
 
@@ -119,4 +120,5 @@ def test_a_level_count_below_one_is_refused():
             {1: (np.zeros((3, 3)), np.array([[0, 1, 2]]))},
             cell_size=(64, 64, 64),
             levels=0,
+            axes=("x", "y", "z"),
         )

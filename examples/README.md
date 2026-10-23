@@ -64,7 +64,7 @@ line that changes:
 ```python
 from obstore.store import S3Store
 
-fabriks.write_meshes(objects, S3Store("my-bucket", ...), prefix=key, cell_size=...)
+fabriks.write_meshes(objects, S3Store("my-bucket", ...), prefix=key, axes=("x", "y", "z"), cell_size=...)
 ```
 
 fabriks asks a store for `put`/`get`/`list` and nothing else, which is deliberately the shape

@@ -66,8 +66,8 @@ class ReadOptions(TypedDict, total=False):
         from :func:`fabriks.plan_grid`, which budgets by bytes -- so a small model can come back
         with one level and no pyramid at all. Pass ``levels`` when coarse levels are the point.
     ``axes``
-        What the three vertex slots mean, if the caller is in a position to say. Nothing is
-        declared by default; see :mod:`fabriks.contrib`.
+        What the three vertex slots mean, in slot order. **Required**: an import without it is
+        refused rather than written with an order a viewer would have to guess.
     ``simplifier`` / ``decimation`` / ``codec`` / ``compression``
         Straight through to :func:`fabriks.build_collection`.
     """
@@ -264,6 +264,9 @@ def import_scene(
     **options: Unpack[ReadOptions],
 ) -> Imported:
     """Fit, build, name and write a scene as a collection. Every ``read_*`` ends here."""
+    axes = options.get("axes")
+    if axes is None:
+        raise TypeError("Importing a scene needs `axes=`: the names of the three vertex slots, in slot order (a glTF's are its x, y, z). A collection without them could only be drawn by guessing.")
     fit = fit_for(scene, options.get("fit"), options.get("resolution", DEFAULT_RESOLUTION))
     objects, names = scene_to_objects(scene, fit=fit)
 
@@ -287,7 +290,7 @@ def import_scene(
         objects,
         cell_size=cell_size,
         levels=levels,
-        axes=options.get("axes"),
+        axes=axes,
         **_encoding_kwargs(options),
     )
     catalog.attach(built, names=names, fit=fit)

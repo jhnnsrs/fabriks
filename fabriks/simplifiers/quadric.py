@@ -1,4 +1,4 @@
-"""``simplification: QUADRIC`` -- quadric edge collapse via fast-simplification. The default.
+"""``simplification: QUADRIC`` -- quadric edge collapse via fast-simplification.
 
 fast-simplification is a dependency of fabriks rather than an extra -- making coarse levels is
 what fabriks is for -- so it is imported plainly here.
@@ -16,7 +16,7 @@ from fabriks.simplifiers.greedy import GreedyEdgeCollapse
 from fabriks.simplifiers.measure import boundary_held, measure_deviation, pinned_held
 from fabriks.simplifiers.protocol import Simplified, Simplifier
 
-#: The ``simplification`` value that selects this backend, and the format's default.
+#: The ``simplification`` value that selects this backend.
 SIMPLIFICATION_QUADRIC = "QUADRIC"
 
 

@@ -59,7 +59,7 @@ def wide(wide_objects: dict[int, Any]) -> fabriks.MeshCollection:
     """The larger collection, built once for the whole session."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        return fabriks.build_collection(wide_objects, cell_size=CELL_SIZE, levels=LEVELS)
+        return fabriks.build_collection(wide_objects, cell_size=CELL_SIZE, levels=LEVELS, axes=("x", "y", "z"))
 
 
 @pytest.fixture()

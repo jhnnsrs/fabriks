@@ -12,8 +12,9 @@ import trimesh
 
 import fabriks
 from fabriks.codecs import QUANT_MAX
-from fabriks.geometry import decimate_fixed, on_planes, snap_boundary
+from fabriks.geometry import clip_to_cells, decimate_fixed, on_planes, snap_boundary
 from fabriks.octree import morton_encode_one
+from fabriks.sources import coerce_mesh
 
 CELL_SIZE = np.array([128, 128, 64], dtype=np.int64)
 LEVELS = 3
@@ -139,7 +140,7 @@ def test_a_small_object_is_not_decimated_out_of_existence():
     """
     tiny = trimesh.creation.box(extents=[6.0, 4.0, 3.0]).apply_translation([40.0, 40.0, 20.0])
 
-    collection = fabriks.build_collection({5: tiny}, cell_size=(128, 128, 64), levels=3)
+    collection = fabriks.build_collection({5: tiny}, cell_size=(128, 128, 64), levels=3, axes=("x", "y", "z"))
 
     for level, shard in collection.shards:
         assert shard.num_rows > 0, f"level {level} lost the only object in the collection"
@@ -153,3 +154,54 @@ def test_on_planes_finds_the_faces_of_the_level_it_is_asked_about():
     assert on_planes(vertices, np.array([128.0, 128.0, 64.0])).tolist() == [True, False]
     # At level 1 the cell is 256 wide, so x=128 is interior -- free for the decimator to spend.
     assert on_planes(vertices, np.array([256.0, 256.0, 128.0])).tolist() == [False, False]
+
+
+def _clip_one_cell_at_a_time(subject: trimesh.Trimesh, cell_size: np.ndarray) -> dict:
+    """The per-cell clip `clip_to_cells` replaced: every bbox cell cut out of the whole mesh."""
+    lower = np.floor(subject.bounds[0] / cell_size).astype(np.int64)
+    upper = np.floor((subject.bounds[1] - 1e-9) / cell_size).astype(np.int64)
+    fragments = {}
+    for triple in np.ndindex(*(upper - lower + 1)):
+        cell = np.asarray(triple) + lower
+        fragment = subject
+        for axis in range(3):
+            for sign in (1.0, -1.0):
+                normal = np.zeros(3)
+                normal[axis] = sign
+                origin = (cell * cell_size).astype(np.float64)
+                if sign < 0:
+                    origin[axis] += cell_size[axis]
+                fragment = trimesh.intersections.slice_mesh_plane(
+                    fragment, plane_normal=normal, plane_origin=origin, cap=False
+                )
+                if fragment is None or not len(fragment.faces):
+                    break
+            if fragment is None or not len(fragment.faces):
+                break
+        if fragment is not None and len(fragment.faces):
+            fragments[tuple(int(c) for c in cell)] = fragment
+    return fragments
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        trimesh.creation.icosphere(radius=40.0, subdivisions=3).apply_translation([70.0, 50.0, 45.0]),
+        # Faces lying exactly in cell planes: the case where which cells get a face is subtle.
+        trimesh.creation.box(extents=[64.0, 64.0, 32.0]).apply_translation([64.0, 64.0, 48.0]),
+        trimesh.creation.capsule(radius=6.0, height=150.0).apply_transform(
+            trimesh.transformations.rotation_matrix(0.9, [1.0, 1.0, 0.0])
+        ).apply_translation([90.0, 90.0, 90.0]),
+    ],
+)
+def test_bisection_clipping_cuts_the_same_cells_as_cutting_each_cell_out(body: trimesh.Trimesh):
+    """The bisection is a speed change only: same cells, same surface in each."""
+    cell_size = np.array([32, 32, 32], dtype=np.int64)
+    expected = _clip_one_cell_at_a_time(body, cell_size)
+    actual = clip_to_cells(coerce_mesh(body), cell_size)
+
+    assert list(actual) == sorted(expected), "a different set of cells, or out of (i, j, k) order"
+    for key, fragment in expected.items():
+        assert np.isclose(actual[key].area, fragment.area), f"cell {key} holds a different surface"
+        low, high = np.asarray(key) * cell_size, (np.asarray(key) + 1) * cell_size
+        assert (actual[key].vertices >= low - 1e-9).all() and (actual[key].vertices <= high + 1e-9).all()

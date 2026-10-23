@@ -66,7 +66,7 @@ def ensure_collection() -> fabriks.Collection:
     store = fabriks.DirectoryStore(OUTPUT, create=True)
     if not (OUTPUT / COLLECTION / "fabriks.json").is_file():
         print(f"No collection at {OUTPUT / COLLECTION}, writing one first...")
-        fabriks.write_meshes(demo_objects(), store, prefix=COLLECTION, cell_size=CELL_SIZE, levels=LEVELS)
+        fabriks.write_meshes(demo_objects(), store, prefix=COLLECTION, cell_size=CELL_SIZE, levels=LEVELS, axes=("x", "y", "z"))
 
     return fabriks.open_collection(store, COLLECTION)
 
@@ -265,7 +265,7 @@ def compare_backends() -> None:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             built = fabriks.build_collection(
-                objects, cell_size=CELL_SIZE, levels=LEVELS, simplifier=name
+                objects, cell_size=CELL_SIZE, levels=LEVELS, simplifier=name, axes=("x", "y", "z")
             )
         faces = [sum(shard.column("index_count").to_pylist()) // 3 for _, shard in built.shards]
         worst = max(built.cell_catalog.column("lod_error").to_pylist())

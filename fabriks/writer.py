@@ -211,6 +211,7 @@ def write_meshes(
     store: FabriksStore,
     prefix: str = "",
     *,
+    axes: Sequence[str],
     cell_size: Sequence[int] | None = None,
     levels: int = 3,
     codec: str | None = None,
@@ -225,8 +226,9 @@ def write_meshes(
 
     The convenience form of :func:`fabriks.build_collection` followed by
     :func:`write_collection`. Build them separately when you want to inspect or check the
-    frames before spending the writes. ``simplifier`` and ``decimation`` are how the coarse
-    levels are made; see :func:`fabriks.build_collection`.
+    frames before spending the writes. ``axes`` names the vertex slots and is required, and
+    ``simplifier`` and ``decimation`` are how the coarse levels are made; see
+    :func:`fabriks.build_collection`.
     """
     from fabriks.manifest import CODEC_NONE, COMPRESSION_NONE
 
@@ -234,6 +236,7 @@ def write_meshes(
         objects,
         cell_size=cell_size,
         levels=levels,
+        axes=axes,
         codec=codec or CODEC_NONE,
         compression=compression or COMPRESSION_NONE,
         simplifier=simplifier,

@@ -37,9 +37,8 @@ my-collection/
 **Install**
 
 ```bash
-pip install fabriks              # Core writer/reader (trimesh, fast-simplification, scipy, shapely)
+pip install fabriks              # Core writer/reader (trimesh, meshoptimizer, fast-simplification, scipy, shapely)
 pip install 'fabriks[obstore]'   # + S3 / GCS / Azure support via obstore
-pip install 'fabriks[meshopt]'   # + MESHOPT blob decoding
 
 ```
 
@@ -65,6 +64,7 @@ manifest = fabriks.write_meshes(
     objects,
     store=LocalStore("/data"),
     prefix="my-collection",
+    axes=("x", "y", "z"),
     **grid_plan.as_kwargs(),
 )
 
@@ -144,7 +144,7 @@ blob = write_obj(collection, level=2)          # or write to a path: write_obj(c
 | Protocol | Options | Notes |
 | --- | --- | --- |
 | **Stores** | `LocalStore`, `S3Store`, `DirectoryStore`, `MemoryStore` | Implements `put`, `get`, `list`, and optional `get_range`. |
-| **Simplifiers** | `"QUADRIC"` (default), `"GREEDY"` | `QUADRIC` uses `fast-simplification` with `preserve_border=True`. Custom simplifiers implement `fabriks.Simplifier`. |
+| **Simplifiers** | `"MESHOPT"` (default), `"QUADRIC"`, `"GREEDY"` | `MESHOPT` uses meshoptimizer with `vertex_lock` = this level's cell planes; `QUADRIC` uses `fast-simplification` with `preserve_border=True`. Custom simplifiers implement `fabriks.Simplifier`. |
 | **Codecs** | `codec`: `NONE`, `MESHOPT`<br>
 
 <br>`compression`: `NONE`, `ZSTD` | Default is `NONE`/`NONE` (raw little-endian arrays for zero-copy GPU upload). |

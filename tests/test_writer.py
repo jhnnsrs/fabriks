@@ -162,7 +162,7 @@ def test_the_declared_index_width_is_the_one_the_blobs_use():
     objects = {1: trimesh.creation.icosphere(radius=20.0).apply_translation([64.0, 64.0, 32.0])}
 
     raw = fabriks.build_collection(
-        objects, cell_size=(128, 128, 64), levels=1, codec=fabriks.CODEC_NONE
+        objects, cell_size=(128, 128, 64), levels=1, codec=fabriks.CODEC_NONE, axes=("x", "y", "z")
     )
 
     assert raw.encoding.indices == fabriks.INDICES_UINT32
@@ -187,7 +187,7 @@ def test_write_meshes_builds_and_writes_in_one_call(objects: dict, tmp_path: Pat
     """The convenience form, and the one most callers will use."""
     store = DirectoryStore(tmp_path)
 
-    manifest = fabriks.write_meshes(objects, store, "c", cell_size=CELL_SIZE, levels=2)
+    manifest = fabriks.write_meshes(objects, store, "c", cell_size=CELL_SIZE, levels=2, axes=("x", "y", "z"))
 
     assert manifest.spec_version == fabriks.SPEC_VERSION
     assert manifest.grid.levels == 2

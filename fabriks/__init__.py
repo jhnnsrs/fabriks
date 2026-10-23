@@ -26,6 +26,7 @@ Writing one::
         objects,
         LocalStore("/data"),          # or an S3Store, or fabriks.DirectoryStore
         prefix="my-collection",
+        axes=("x", "y", "z"),         # what the three vertex slots are, in slot order -- required
         cell_size=(128, 128, 64),     # in voxels, in your data's own component order
     )
 
@@ -48,9 +49,9 @@ octree comes out the same either way.
 
 The ``x``/``y``/``z`` in the ``bbox_min_x`` column names are labels for those three slots,
 fixed by the Parquet schema a server checks. They are not a claim about which physical axis
-each slot holds, and the format makes no such claim anywhere: naming these axes is a statement
-about how the collection relates to the image it came from or the coordinate graph it sits in,
-which belongs to whatever owns that coordinate system rather than to `fabriks.json`.
+each slot holds. That claim is the manifest's ``axes``, which every writer must state
+(``build_collection(..., axes=...)``): nothing in the format decodes through it, but a viewer
+has no other way to know which slot is which, and without it could only guess.
 
 An order mistake here cannot misplace geometry: clipping and quantization read the same
 ``cell_size``, so a mismatched one yields a differently *shaped* octree rather than displaced
@@ -60,12 +61,14 @@ and mesh cells pulls the same regions.
 
 Simplification
 --------------
-A coarse level is made by a pluggable backend, named the way a codec is: ``"QUADRIC"`` is the
-default, backed by ``fast-simplification`` -- it collapses to the quadric-optimal shape while
-pinning every vertex on the cut boundary at exactly its input position, which is what makes
-``boundary: LOCKED`` provable rather than intended. ``"GREEDY"`` is a pure-numpy alternative,
-useful where a heavily pinned boundary stops the quadric collapse reaching a budget::
+A coarse level is made by a pluggable backend, named the way a codec is: ``"MESHOPT"`` is the
+default, backed by ``meshoptimizer`` -- it locks exactly the vertices on this level's cell planes
+and never repositions a vertex, so every survivor is at exactly its input position, which is what
+makes ``boundary: LOCKED`` provable rather than intended. ``"QUADRIC"`` (``fast-simplification``)
+moves interior vertices to the quadric-optimal shape but pins the whole topological boundary;
+``"GREEDY"`` is a pure-numpy alternative that will collapse onto a locked vertex::
 
+    fabriks.build_collection(objects, cell_size=..., simplifier="QUADRIC")
     fabriks.build_collection(objects, cell_size=..., simplifier="GREEDY")
     fabriks.build_collection(objects, cell_size=..., simplifier=fabriks.GreedyEdgeCollapse())
     fabriks.build_collection(objects, cell_size=..., decimation=fabriks.Decimation.half())
@@ -144,8 +147,10 @@ from fabriks.reader import (
 from fabriks.simplifiers import (
     SIMPLIFICATION_DEFAULT,
     SIMPLIFICATION_GREEDY,
+    SIMPLIFICATION_MESHOPT,
     SIMPLIFICATION_QUADRIC,
     GreedyEdgeCollapse,
+    MeshoptSimplifier,
     QuadricSimplifier,
     Simplified,
     Simplifier,
@@ -195,6 +200,7 @@ __all__ = [
     "REQUIRED_COLUMNS",
     "SIMPLIFICATION_DEFAULT",
     "SIMPLIFICATION_GREEDY",
+    "SIMPLIFICATION_MESHOPT",
     "SIMPLIFICATION_QUADRIC",
     "SPEC_VERSION",
     "AsyncReadable",
@@ -223,6 +229,7 @@ __all__ = [
     "MeshCollection",
     "MeshSource",
     "MeshoptCodec",
+    "MeshoptSimplifier",
     "MissingExtraError",
     "ObjectEntry",
     "PartitioningError",

@@ -78,7 +78,7 @@ def many(many_objects: dict[int, Any]) -> fabriks.MeshCollection:
     """The larger collection, built once."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        return fabriks.build_collection(many_objects, cell_size=CELL_SIZE, levels=LEVELS)
+        return fabriks.build_collection(many_objects, cell_size=CELL_SIZE, levels=LEVELS, axes=("x", "y", "z"))
 
 
 @pytest.fixture()

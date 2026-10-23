@@ -30,7 +30,7 @@ def build_quietly(objects: dict[int, Any], plan: fabriks.GridPlan) -> fabriks.Me
     """The collection a plan describes. The QUARTER warning is asserted on elsewhere."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        return fabriks.build_collection(objects, **plan.as_kwargs())
+        return fabriks.build_collection(objects, axes=("x", "y", "z"), **plan.as_kwargs())
 
 
 @pytest.fixture(scope="module")

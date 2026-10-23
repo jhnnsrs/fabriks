@@ -106,7 +106,7 @@ def main() -> None:
     # ------ 2. reading it ------ #
     rule("2. Reading it")
     store = fabriks.DirectoryStore(OUTPUT / "store")
-    imported = read_glb(blob, store, COLLECTION, cell_size=CELL_SIZE, levels=LEVELS)
+    imported = read_glb(blob, store, COLLECTION, cell_size=CELL_SIZE, levels=LEVELS, axes=("x", "y", "z"))
     print(f"fit       scale x{imported.fit.scale:.1f}, then shift {np.round(imported.fit.translation, 1).tolist()}")
     print(f"names     {imported.names}")
     print(
@@ -121,7 +121,7 @@ def main() -> None:
 
     # No fit at all: the model is where the file put it, which is across the origin.
     try:
-        read_glb(blob, fabriks.MemoryStore(), "raw", fit=VoxelFit.identity(), levels=1)
+        read_glb(blob, fabriks.MemoryStore(), "raw", fit=VoxelFit.identity(), levels=1, axes=("x", "y", "z"))
     except ValueError as error:
         print(f"no fit at all      -> refused: {error}")
 
@@ -136,6 +136,7 @@ def main() -> None:
             fit=VoxelFit(scale=1.0, translation=(0.6, 0.6, 0.6)),
             cell_size=(1, 1, 1),
             levels=1,
+            axes=("x", "y", "z"),
         )
     shifted = fabriks.open_collection(shifted_store, "shifted")
 

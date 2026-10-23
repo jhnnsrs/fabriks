@@ -23,11 +23,15 @@ from fabriks.simplifiers import (
 )
 from fabriks.simplifiers import quadric as quadric_module
 
-BACKENDS = (fabriks.SIMPLIFICATION_QUADRIC, fabriks.SIMPLIFICATION_GREEDY)
+BACKENDS = (
+    fabriks.SIMPLIFICATION_MESHOPT,
+    fabriks.SIMPLIFICATION_QUADRIC,
+    fabriks.SIMPLIFICATION_GREEDY,
+)
 
 
 def backend(name: str) -> fabriks.Simplifier:
-    """One of the two backends, by the name that selects it."""
+    """One of the backends, by the name that selects it."""
     return simplifier_for(name)
 
 
@@ -194,6 +198,29 @@ def test_the_deviation_measure_is_an_upper_bound_and_grows_with_reduction():
     assert all(error > 0.0 for error in errors)
 
 
+def test_the_meshopt_backend_keeps_every_survivor_where_it_was_and_reaches_past_the_border():
+    """What the lock buys: exactly the mask is held, and nothing is ever repositioned.
+
+    The cut boundary of this sheet is left *unlocked*, so the budget is not held hostage by it --
+    which is the case `preserve_border` cannot express -- and still every surviving vertex is
+    bit-identical to an input vertex, because meshoptimizer only chooses which ones survive.
+    """
+    vertices, faces = a_cut_sheet()
+    boundary = border_vertices(faces)
+    fixed = np.zeros(len(vertices), dtype=bool)
+    fixed[boundary[: len(boundary) // 2]] = True
+
+    result = fabriks.MeshoptSimplifier().simplify(
+        vertices, faces, fixed=fixed, target_faces=len(faces) // 4
+    )
+
+    for position in result.vertices:
+        assert (vertices == position).all(axis=1).any(), "a survivor was moved"
+    for position in vertices[fixed]:
+        assert (result.vertices == position).all(axis=1).any(), "a locked vertex was collapsed"
+    assert result.backend == fabriks.SIMPLIFICATION_MESHOPT, "the fallback should not have run"
+
+
 def test_measuring_deviation_against_an_unchanged_mesh_is_zero():
     """The identity case, since the bound is what a budget is spent against."""
     vertices, _ = a_sphere(subdivisions=1)
@@ -256,12 +283,13 @@ def test_the_boundary_check_notices_a_boundary_that_did_not_hold():
 # --------------------------------------------------------------------------- #
 
 
-def test_a_name_selects_a_backend_and_the_default_is_the_quadric_one():
+def test_a_name_selects_a_backend_and_the_default_is_the_meshopt_one():
     """`simplification` is a value out of a vocabulary, the way `codec` is."""
+    assert isinstance(simplifier_for(fabriks.SIMPLIFICATION_MESHOPT), fabriks.MeshoptSimplifier)
     assert isinstance(simplifier_for(fabriks.SIMPLIFICATION_QUADRIC), fabriks.QuadricSimplifier)
     assert isinstance(simplifier_for(fabriks.SIMPLIFICATION_GREEDY), fabriks.GreedyEdgeCollapse)
-    assert isinstance(resolve_simplifier(None), fabriks.QuadricSimplifier), (
-        "the default is the quadric collapse"
+    assert isinstance(resolve_simplifier(None), fabriks.MeshoptSimplifier), (
+        "the default is the meshopt collapse"
     )
 
     # A fresh instance each time, so one caller's adjustment is not everyone's.
@@ -309,7 +337,7 @@ def test_a_collection_built_with_either_backend_holds_the_same_invariants(name: 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         collection = fabriks.build_collection(
-            objects, cell_size=(128, 128, 64), levels=3, simplifier=backend(name)
+            objects, cell_size=(128, 128, 64), levels=3, simplifier=backend(name), axes=("x", "y", "z")
         )
 
     store = fabriks.MemoryStore()
@@ -347,7 +375,7 @@ def test_the_backend_choice_does_not_change_the_partition(objects: dict):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             built[name] = fabriks.build_collection(
-                objects, cell_size=(128, 128, 64), levels=3, simplifier=backend(name)
+                objects, cell_size=(128, 128, 64), levels=3, simplifier=backend(name), axes=("x", "y", "z")
             )
 
     for level in range(3):
@@ -364,9 +392,9 @@ def test_the_manifest_declares_the_reduction_that_was_actually_applied(objects: 
     """`decimation` is a claim about the geometry that nothing downstream can re-derive."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        quarter = fabriks.build_collection(objects, cell_size=(128, 128, 64), levels=2)
+        quarter = fabriks.build_collection(objects, cell_size=(128, 128, 64), levels=2, axes=("x", "y", "z"))
         half = fabriks.build_collection(
-            objects, cell_size=(128, 128, 64), levels=2, decimation=fabriks.Decimation.half()
+            objects, cell_size=(128, 128, 64), levels=2, decimation=fabriks.Decimation.half(), axes=("x", "y", "z")
         )
 
     assert quarter.manifest.encoding.decimation == fabriks.DECIMATION_QUARTER

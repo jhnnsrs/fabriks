@@ -120,6 +120,10 @@ def main() -> None:
         # `codec` and `compression` both default to NONE, so a blob is the raw little-endian
         # layout a consumer uploads as-is. `compression="ZSTD"` and `codec="MESHOPT"` (the
         # latter needing the `meshopt` extra) trade a decoder on the reading side for size.
+        #
+        # What the three vertex slots are, in slot order -- required, because it is the only
+        # statement anywhere of which component is which axis.
+        axes=("x", "y", "z"),
     )
 
     print(f"wrote {OUTPUT / COLLECTION}")
@@ -143,7 +147,7 @@ def main() -> None:
     # 2. The two-step form: build, inspect, then write.
     # ---------------------------------------------------------------- #
     rule("The same thing in two steps, when you want to look first")
-    collection = fabriks.build_collection(objects, cell_size=CELL_SIZE, levels=LEVELS)
+    collection = fabriks.build_collection(objects, cell_size=CELL_SIZE, levels=LEVELS, axes=("x", "y", "z"))
 
     print(f"cell catalog   : {collection.cell_catalog.num_rows} rows -- the spatial index")
     print(f"                 columns: {', '.join(collection.cell_catalog.column_names[:6])}, ...")
@@ -182,9 +186,9 @@ def main() -> None:
         instance_id: (mesh.vertices[:, ::-1], mesh.faces) for instance_id, mesh in objects.items()
     }
     reversed_collection = fabriks.build_collection(
-        same_scene_reversed, cell_size=CELL_SIZE[::-1], levels=1
+        same_scene_reversed, cell_size=CELL_SIZE[::-1], levels=1, axes=("z", "y", "x")
     )
-    forward = fabriks.build_collection(objects, cell_size=CELL_SIZE, levels=1)
+    forward = fabriks.build_collection(objects, cell_size=CELL_SIZE, levels=1, axes=("x", "y", "z"))
 
     print(f"manifest keys       : {sorted(manifest.to_dict())}")
     print(f"the scene as given  : cell_size={CELL_SIZE}, {forward.shards[0][1].num_rows} cells at level 0")
@@ -208,7 +212,7 @@ def main() -> None:
         "obstore already has. So the same call writes to S3 with no adapter:\n"
         "\n"
         "    from obstore.store import S3Store\n"
-        "    fabriks.write_meshes(objects, S3Store('my-bucket', ...), prefix=key, cell_size=...)\n"
+        "    fabriks.write_meshes(objects, S3Store('my-bucket', ...), prefix=key, axes=('x', 'y', 'z'), cell_size=...)\n"
         "\n"
         "and `fabriks.MemoryStore()` keeps the whole thing in a dict, which is what the tests use."
     )

@@ -60,6 +60,22 @@ def _find(parent: npt.NDArray[np.int64], index: int) -> int:
     return root
 
 
+def _roots(parent: npt.NDArray[np.int64]) -> npt.NDArray[np.int64]:
+    """Every vertex's union-find root at once, by pointer jumping, compressing ``parent`` in place.
+
+    Vectorised rather than a ``_find`` per vertex: the face count is taken over and over during a
+    collapse, and a Python call per vertex per count is what made the collapse quadratic.
+    """
+    roots = parent
+    while True:
+        jumped = roots[roots]
+        if (jumped == roots).all():
+            break
+        roots = jumped
+    parent[:] = roots
+    return roots.copy()
+
+
 def decimate_fixed(
     vertices: npt.NDArray[np.float64],
     faces: npt.NDArray[np.int64],
@@ -76,16 +92,19 @@ def decimate_fixed(
     collapsed; an edge with one is collapsed *onto* the fixed vertex, which is what keeps a cell
     face plane exactly where the clip put it.
 
-    This is the kernel behind ``simplification: GREEDY``, and the default ``QUADRIC`` is both
-    better shaped and better measured -- reach for this one where a heavily pinned boundary stops
-    the quadric collapse reaching a budget. Two things to
-    know about it: the edge order is computed once from the initial lengths and never
+    This is the kernel behind ``simplification: GREEDY``, and ``MESHOPT`` (the default) and
+    ``QUADRIC`` are both better shaped and better measured -- reach for this one where a heavily
+    pinned boundary stops the others reaching a budget. Two things to know about it: the edge order is computed once from the initial lengths and never
     re-measured as vertices move, and no collapse is checked for validity, so an aggressive
     target on a flat-faced surface can consume it entirely. :mod:`fabriks.simplifiers` handles the
     second by relaxing the target until something survives.
 
-    ``check_interval`` is how many collapses to make between face counts; ``None`` picks 16 on
-    a mesh above 256 faces and 1 below, where the overshoot would be fatal. ``placement`` is
+    ``check_interval`` is how many collapses to make between face counts; ``None`` counts after
+    every collapse below 256 faces, where the overshoot would be fatal, and above that after an
+    eighth as many collapses as there are faces left to take. One collapse retires about two
+    faces, but a merge between two grown clusters can retire many more, so the batch is sized
+    well under the gap; it still shrinks geometrically, and the count is taken ``O(log F)``
+    times rather than ``F/16``. ``placement`` is
     ``"midpoint"`` (move both endpoints to their average) or ``"onto_fixed"`` (never move a
     vertex at all, collapsing onto one endpoint -- lower quality, but every surviving vertex
     keeps its exact input position).
@@ -113,8 +132,7 @@ def decimate_fixed(
     is_fixed = fixed.copy()
 
     def live_face_count() -> int:
-        roots = np.array([_find(parent, int(v)) for v in range(len(vertices))], dtype=np.int64)
-        mapped = roots[faces]
+        mapped = _roots(parent)[faces]
         keep = (mapped[:, 0] != mapped[:, 1]) & (mapped[:, 1] != mapped[:, 2]) & (mapped[:, 0] != mapped[:, 2])
         return int(keep.sum())
 
@@ -122,9 +140,11 @@ def decimate_fixed(
     # amortised over a batch of collapses -- but a *small* mesh cannot afford the overshoot
     # that buys: one collapse can retire several faces, so a batch of 16 can take a 12-face
     # object from above its target to nothing at all. Below a few hundred faces the count is
-    # cheap and the overshoot is fatal, so it is paid every collapse.
+    # cheap and the overshoot is fatal, so it is paid every collapse. Above, the batch is sized
+    # to the gap still to close, which is what keeps the number of counts logarithmic.
+    adaptive = check_interval is None and len(faces) > 256
     if check_interval is None:
-        check_interval = 16 if len(faces) > 256 else 1
+        check_interval = max(1, (len(faces) - target_faces) // 8) if adaptive else 1
     check_interval = max(1, int(check_interval))
 
     collapses_since_check = 0
@@ -148,10 +168,13 @@ def decimate_fixed(
         collapses_since_check += 1
         if collapses_since_check >= check_interval:
             collapses_since_check = 0
-            if live_face_count() <= target_faces:
+            live = live_face_count()
+            if live <= target_faces:
                 break
+            if adaptive:
+                check_interval = max(1, (live - target_faces) // 8)
 
-    roots = np.array([_find(parent, int(v)) for v in range(len(vertices))], dtype=np.int64)
+    roots = _roots(parent)
     mapped = roots[faces]
     keep = (mapped[:, 0] != mapped[:, 1]) & (mapped[:, 1] != mapped[:, 2]) & (mapped[:, 0] != mapped[:, 2])
     mapped = mapped[keep]
@@ -273,37 +296,59 @@ def clip_to_cells(mesh: Mesh, cell_size: npt.NDArray[np.int64]) -> dict[tuple[in
     ``cap=False``: a cell holds a piece of a *surface*, not a solid. The neighbouring cell
     continues the surface across the shared plane, so a cap would be a wall inside the object,
     doubling the triangles on every cell face and showing through anything transparent.
+
+    **Recursive bisection, not one cut-out per cell.** Cutting each cell of the bounding box out
+    of the whole mesh costs a full-mesh slice per cell -- empty ones included, which on a long
+    diagonal object are most of them -- so the clip was ``cells x faces``. Halving the piece at
+    the middle cell plane of its widest index range instead puts each face through about
+    ``log2(cells)`` slices, and a half with no geometry is dropped before it costs anything. Both
+    halves of a split come from the same parent and the same plane, so the seam between them is
+    cut once rather than twice.
     """
     subject = mesh.as_trimesh()
     low, high = subject.bounds[0], subject.bounds[1]
+    size = np.asarray(cell_size, dtype=np.float64)
 
     lower = np.floor(np.asarray(low) / cell_size).astype(np.int64)
     upper = np.floor((np.asarray(high) - 1e-9) / cell_size).astype(np.int64)
 
     fragments: dict[tuple[int, int, int], Any] = {}
-    for i in range(lower[0], upper[0] + 1):
-        for j in range(lower[1], upper[1] + 1):
-            for k in range(lower[2], upper[2] + 1):
-                triple = np.array([i, j, k], dtype=np.int64)
-                origin = triple * cell_size
-                fragment = subject
-                for axis in range(3):
-                    for sign in (1.0, -1.0):
-                        normal = np.zeros(3)
-                        normal[axis] = sign
-                        plane_origin = origin.astype(np.float64).copy()
-                        if sign < 0:
-                            plane_origin[axis] += cell_size[axis]
-                        fragment = trimesh.intersections.slice_mesh_plane(
-                            fragment, plane_normal=normal, plane_origin=plane_origin, cap=False
-                        )
-                        if fragment is None or len(fragment.faces) == 0:
-                            break
-                    if fragment is None or len(fragment.faces) == 0:
-                        break
-                if fragment is not None and len(fragment.faces) > 0:
-                    fragments[(int(i), int(j), int(k))] = fragment
-    return fragments
+    pending: list[tuple[Any, npt.NDArray[np.int64], npt.NDArray[np.int64]]] = [(subject, lower, upper)]
+    while pending:
+        piece, first, last = pending.pop()
+        span = last - first
+        if not span.any():
+            fragments[(int(first[0]), int(first[1]), int(first[2]))] = piece
+            continue
+
+        axis = int(np.argmax(span))
+        middle = int(first[axis] + (span[axis] + 1) // 2)
+        plane_origin = np.zeros(3)
+        plane_origin[axis] = float(middle * cell_size[axis])
+        for sign in (-1.0, 1.0):
+            normal = np.zeros(3)
+            normal[axis] = sign
+            half = trimesh.intersections.slice_mesh_plane(
+                piece, plane_normal=normal, plane_origin=plane_origin, cap=False
+            )
+            if half is None or len(half.faces) == 0:
+                continue
+            half_first, half_last = first.copy(), last.copy()
+            if sign < 0:
+                half_last[axis] = middle - 1
+            else:
+                half_first[axis] = middle
+            # Narrow to the cells whose *closed* box the half still touches. Closed, so a face
+            # lying exactly in a cell plane reaches every cell the per-cell cut gave it to.
+            half_low, half_high = half.bounds[0], half.bounds[1]
+            half_first = np.maximum(half_first, np.ceil(half_low / size).astype(np.int64) - 1)
+            half_last = np.minimum(half_last, np.floor(half_high / size).astype(np.int64))
+            if (half_first <= half_last).all():
+                pending.append((half, half_first, half_last))
+
+    # In (i, j, k) order, as the per-cell loop produced them: the fragments of a coarse cell are
+    # welded in this order, so it decides vertex order and with it what the simplifier sees.
+    return dict(sorted(fragments.items()))
 
 
 def concatenate_and_weld(

@@ -63,7 +63,7 @@ def source():
 def written(source):
     """The scene read in through GLB, as an opened collection."""
     store = fabriks.MemoryStore()
-    read_glb(source.export(file_type="glb"), store, "c", cell_size=CELL_SIZE, levels=LEVELS)
+    read_glb(source.export(file_type="glb"), store, "c", cell_size=CELL_SIZE, levels=LEVELS, axes=("x", "y", "z"))
     return fabriks.open_collection(store, "c")
 
 
@@ -138,7 +138,7 @@ def test_a_collection_survives_being_written_out_and_read_back(file_type, writte
     read, write = NAMED[file_type]
     store = fabriks.MemoryStore()
 
-    read(write(written), store, "again", cell_size=CELL_SIZE, levels=LEVELS)
+    read(write(written), store, "again", cell_size=CELL_SIZE, levels=LEVELS, axes=("x", "y", "z"))
     again = fabriks.open_collection(store, "again")
 
     assert sorted(again.objects) == sorted(written.objects), (
@@ -157,7 +157,7 @@ def test_a_format_without_names_comes_back_as_one_object(file_type, written):
     read, write = MERGING[file_type]
     store = fabriks.MemoryStore()
 
-    read(write(written), store, "merged", cell_size=CELL_SIZE, levels=LEVELS)
+    read(write(written), store, "merged", cell_size=CELL_SIZE, levels=LEVELS, axes=("x", "y", "z"))
     merged = fabriks.open_collection(store, "merged")
 
     assert len(merged.objects) == 1, (
@@ -190,7 +190,7 @@ def test_a_gltf_goes_out_and_comes_back_through_its_own_mapping(written):
     assert any(name.endswith(".gltf") for name in blob), f"no document in {sorted(blob)}"
     assert any(name.endswith(".bin") for name in blob), f"no buffers in {sorted(blob)}"
 
-    read_gltf(blob, store, "c", cell_size=CELL_SIZE, levels=LEVELS)
+    read_gltf(blob, store, "c", cell_size=CELL_SIZE, levels=LEVELS, axes=("x", "y", "z"))
     again = fabriks.open_collection(store, "c")
 
     assert {entry.name for entry in again.objects.values()} == {"7", "head"}
@@ -206,7 +206,7 @@ def test_a_gltf_blob_whose_buffers_are_elsewhere_says_what_to_pass_instead(writt
     document = next(name for name in blob if name.endswith(".gltf"))
 
     with pytest.raises(fabriks.FormatError, match="external buffer"):
-        read_gltf(blob[document], fabriks.MemoryStore(), "c")
+        read_gltf(blob[document], fabriks.MemoryStore(), "c", axes=("x", "y", "z"))
 
 
 def test_a_gltf_read_from_a_path_finds_its_own_buffers(written, tmp_path):
@@ -214,7 +214,7 @@ def test_a_gltf_read_from_a_path_finds_its_own_buffers(written, tmp_path):
     write_gltf(written, tmp_path / "model.gltf")
     store = fabriks.MemoryStore()
 
-    read_gltf(tmp_path / "model.gltf", store, "c", cell_size=CELL_SIZE, levels=LEVELS)
+    read_gltf(tmp_path / "model.gltf", store, "c", cell_size=CELL_SIZE, levels=LEVELS, axes=("x", "y", "z"))
 
     assert {entry.name for entry in fabriks.open_collection(store, "c").objects.values()} == {
         "7",

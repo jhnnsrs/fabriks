@@ -345,7 +345,7 @@ def test_a_surface_tangent_to_a_cell_plane_is_not_reported_as_drifted():
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        built = fabriks.build_collection({1: tangent, 2: clear}, cell_size=CELL_SIZE, levels=LEVELS)
+        built = fabriks.build_collection({1: tangent, 2: clear}, cell_size=CELL_SIZE, levels=LEVELS, axes=("x", "y", "z"))
     store = fabriks.MemoryStore()
     fabriks.write_collection(built, store, "c")
 
@@ -390,7 +390,7 @@ def test_a_single_level_collection_verifies(objects: dict[int, Any]):
     """One level means no cross-level claims to check, which must be a pass and not a crash."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        built = fabriks.build_collection(objects, cell_size=CELL_SIZE, levels=1)
+        built = fabriks.build_collection(objects, cell_size=CELL_SIZE, levels=1, axes=("x", "y", "z"))
     store = fabriks.MemoryStore()
     fabriks.write_collection(built, store, "c")
 

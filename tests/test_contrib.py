@@ -53,7 +53,7 @@ def dense_objects():
 def imported(scene, **options: object):
     """Read a scene through GLB into a memory store, and open what came out."""
     store = fabriks.MemoryStore()
-    result = read_glb(scene.export(file_type="glb"), store, "c", **options)
+    result = read_glb(scene.export(file_type="glb"), store, "c", **{"axes": ("x", "y", "z"), **options})
     return result, fabriks.open_collection(store, "c")
 
 
@@ -203,7 +203,7 @@ def test_an_object_that_is_only_a_mesh_still_reads():
     store = fabriks.MemoryStore()
     mesh = trimesh.creation.icosphere(radius=1.0, subdivisions=2)
 
-    result = read_glb(trimesh.Scene(mesh).export(file_type="glb"), store, "c", levels=2)
+    result = read_glb(trimesh.Scene(mesh).export(file_type="glb"), store, "c", levels=2, axes=("x", "y", "z"))
 
     assert len(result.names) == 1, "one mesh is one object"
 

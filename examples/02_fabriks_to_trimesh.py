@@ -66,7 +66,7 @@ def ensure_collection() -> fabriks.Collection:
     store = fabriks.DirectoryStore(OUTPUT, create=True)
     if not (OUTPUT / COLLECTION / "fabriks.json").is_file():
         print(f"No collection at {OUTPUT / COLLECTION}, writing one first...")
-        fabriks.write_meshes(demo_objects(), store, prefix=COLLECTION, cell_size=CELL_SIZE, levels=LEVELS)
+        fabriks.write_meshes(demo_objects(), store, prefix=COLLECTION, cell_size=CELL_SIZE, levels=LEVELS, axes=("x", "y", "z"))
 
     return fabriks.open_collection(store, COLLECTION)
 

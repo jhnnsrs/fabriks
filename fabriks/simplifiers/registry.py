@@ -1,7 +1,7 @@
 """Which backend a name selects, and the retry policy every backend is driven through.
 
 ``simplification`` is a *value*, the way ``codec`` is: a name from a vocabulary the format
-defines, resolved to an implementation here. ``QUADRIC`` is the default. Adding a backend is a
+defines, resolved to an implementation here. ``MESHOPT`` is the default. Adding a backend is a
 module beside this one and an entry in the table -- and passing an instance stays available for
 the cases where the defaults need adjusting.
 """
@@ -15,14 +15,16 @@ import numpy.typing as npt
 
 from fabriks.errors import FormatError
 from fabriks.simplifiers.greedy import SIMPLIFICATION_GREEDY, GreedyEdgeCollapse
+from fabriks.simplifiers.meshopt import SIMPLIFICATION_MESHOPT, MeshoptSimplifier
 from fabriks.simplifiers.protocol import Simplified, Simplifier
 from fabriks.simplifiers.quadric import SIMPLIFICATION_QUADRIC, QuadricSimplifier
 
-#: The backend used when none is named: quadric-optimal shapes with the boundary pinned.
-SIMPLIFICATION_DEFAULT = SIMPLIFICATION_QUADRIC
+#: The backend used when none is named: the one that pins exactly the cell planes and no more.
+SIMPLIFICATION_DEFAULT = SIMPLIFICATION_MESHOPT
 
 #: Every backend that ships, keyed by the ``simplification`` value that selects it.
 _SIMPLIFIERS: dict[str, type[Simplifier]] = {
+    SIMPLIFICATION_MESHOPT: MeshoptSimplifier,
     SIMPLIFICATION_QUADRIC: QuadricSimplifier,
     SIMPLIFICATION_GREEDY: GreedyEdgeCollapse,
 }
@@ -58,7 +60,7 @@ def resolve_simplifier(simplifier: Any) -> Simplifier:  # noqa: ANN401
         raise TypeError(
             f"A simplifier is one of {', '.join(sorted(_SIMPLIFIERS))}, or an object providing a "
             f"`simplify(vertices, faces, *, fixed, target_faces)` method; {type(simplifier).__name__} is "
-            f"neither. Try fabriks.QuadricSimplifier() or fabriks.GreedyEdgeCollapse()."
+            f"neither. Try fabriks.MeshoptSimplifier(), fabriks.QuadricSimplifier() or fabriks.GreedyEdgeCollapse()."
         )
     return simplifier
 

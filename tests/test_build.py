@@ -66,30 +66,38 @@ def test_a_cell_addresses_the_box_its_geometry_actually_occupies(
 
 
 def test_the_manifest_carries_the_shape_and_the_axes_it_was_told():
-    """A collection states the voxel extent it was built over, and names the axes if it knows them.
+    """A collection states the voxel extent it was built over, and the axes its slots are.
 
-    ``shape`` is measured from the geometry, so it is always present. ``axes`` is what the
-    caller declared about the coordinate system the objects came from: without a declaration
-    the key is still written, as ``null``, so a reader never has to guess whether the format
-    knows the concept.
+    ``shape`` is measured from the geometry. ``axes`` is what the caller declared the three
+    vertex slots to be, written verbatim -- in whatever order, because the slots are positional.
     """
     objects = {1: trimesh.creation.icosphere(radius=20.0).apply_translation([64.0, 64.0, 32.0])}
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        unnamed = fabriks.build_collection(objects, cell_size=(128, 128, 64), levels=2)
+        forward = fabriks.build_collection(objects, cell_size=(128, 128, 64), levels=2, axes=("x", "y", "z"))
         named = fabriks.build_collection(
             objects, cell_size=(128, 128, 64), levels=2, axes=("z", "y", "x")
         )
 
-    written = unnamed.manifest.to_dict()
+    written = forward.manifest.to_dict()
     assert set(written) == {"specVersion", "grid", "encoding", "counts", "files", "shape", "axes"}
-    assert written["axes"] is None
+    assert written["axes"] == ["x", "y", "z"]
     assert len(written["shape"]) == 3
     assert all(isinstance(size, int) and size > 0 for size in written["shape"])
 
     assert named.manifest.to_dict()["axes"] == ["z", "y", "x"]
     assert named.manifest.to_dict()["shape"] == written["shape"]
+
+
+def test_a_collection_is_never_built_without_naming_its_slots():
+    """No default order: a viewer handed none would have to guess, and a wrong guess only transposes."""
+    objects = {1: trimesh.creation.icosphere(radius=20.0).apply_translation([64.0, 64.0, 32.0])}
+
+    with pytest.raises(TypeError):
+        fabriks.build_collection(objects, cell_size=(128, 128, 64), levels=2)  # type: ignore[call-arg]
+    with pytest.raises(TypeError, match="axes"):
+        fabriks.build_collection(objects, cell_size=(128, 128, 64), levels=2, axes=None)  # type: ignore[arg-type]
 
 
 def test_the_encoding_always_states_the_keys_a_decoder_cannot_infer(
@@ -115,7 +123,7 @@ def test_the_declared_codec_is_the_one_that_was_applied():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         raw = fabriks.build_collection(
-            objects, cell_size=(128, 128, 64), levels=2, codec=fabriks.CODEC_NONE
+            objects, cell_size=(128, 128, 64), levels=2, codec=fabriks.CODEC_NONE, axes=("x", "y", "z")
         )
 
     assert raw.manifest.encoding.codec == fabriks.CODEC_NONE
@@ -250,7 +258,9 @@ def test_a_missed_quarter_budget_is_warned_about():
 
     The cell here is far smaller than the object, which is the cause worth warning about: every
     cut vertex is pinned by ``boundary: LOCKED`` and the decimator may not spend it, so
-    ``QUARTER`` stalls at about half however many levels are asked for.
+    ``QUARTER`` stalls at about half however many levels are asked for. ``QUADRIC``, which pins
+    the whole topological boundary, is the backend that stalls; the default ``MESHOPT`` locks
+    only the cell planes and reaches the budget here.
     """
     objects = {
         1: trimesh.creation.icosphere(radius=40.0, subdivisions=3).apply_translation(
@@ -259,7 +269,7 @@ def test_a_missed_quarter_budget_is_warned_about():
     }
 
     with pytest.warns(UserWarning, match="decimation: QUARTER"):
-        fabriks.build_collection(objects, cell_size=(4, 4, 4), levels=2)
+        fabriks.build_collection(objects, cell_size=(4, 4, 4), levels=2, axes=("x", "y", "z"), simplifier="QUADRIC")
 
 
 def test_choosing_a_cell_size_beats_a_cell_smaller_than_the_objects(objects: dict):
@@ -282,8 +292,8 @@ def test_raw_vertex_and_face_arrays_are_accepted_without_trimesh_in_the_caller(o
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        from_pair = fabriks.build_collection(pairs, cell_size=CELL_SIZE, levels=2)
-        from_mesh = fabriks.build_collection({3: source}, cell_size=CELL_SIZE, levels=2)
+        from_pair = fabriks.build_collection(pairs, cell_size=CELL_SIZE, levels=2, axes=("x", "y", "z"))
+        from_mesh = fabriks.build_collection({3: source}, cell_size=CELL_SIZE, levels=2, axes=("x", "y", "z"))
 
     assert from_pair.cell_catalog.to_pylist() == from_mesh.cell_catalog.to_pylist()
 
@@ -292,7 +302,7 @@ def test_faces_that_do_not_belong_to_their_vertices_are_refused():
     """Caught at coercion, where the message can still name the object."""
     with pytest.raises(ValueError, match="Object 4"):
         fabriks.build_collection(
-            {4: (np.zeros((3, 3)), np.array([[0, 1, 9]]))}, cell_size=CELL_SIZE
+            {4: (np.zeros((3, 3)), np.array([[0, 1, 9]]))}, cell_size=CELL_SIZE, axes=("x", "y", "z")
         )
 
 
@@ -422,11 +432,11 @@ def test_the_component_order_is_the_callers_and_fabriks_never_interprets_it():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         forward = fabriks.build_collection(
-            {7: (vertices, faces)}, cell_size=(128, 128, 64), levels=3
+            {7: (vertices, faces)}, cell_size=(128, 128, 64), levels=3, axes=("x", "y", "z")
         )
-        # The same scene in the reverse order: components reversed, cell size reversed with them.
+        # The same scene in the reverse order: components reversed, cell size and slot names with them.
         reversed_ = fabriks.build_collection(
-            {7: (vertices[:, ::-1], faces)}, cell_size=(64, 128, 128), levels=3
+            {7: (vertices[:, ::-1], faces)}, cell_size=(64, 128, 128), levels=3, axes=("z", "y", "x")
         )
 
     assert [shard.num_rows for _, shard in forward.shards] == [
@@ -472,7 +482,7 @@ def test_the_component_order_changes_the_partition_and_never_the_geometry():
     for label, cell_size in (("matched", (128, 128, 512)), ("reversed", (512, 128, 128))):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            collection = fabriks.build_collection(objects, cell_size=cell_size, levels=1)
+            collection = fabriks.build_collection(objects, cell_size=cell_size, levels=1, axes=("x", "y", "z"))
         store = fabriks.MemoryStore()
         fabriks.write_collection(collection, store, "c")
         decoded[label] = (

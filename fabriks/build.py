@@ -161,7 +161,7 @@ def build_collection(
     *,
     cell_size: Sequence[int] | None = None,
     levels: int = 3,
-    axes: Sequence[str] | None = None,
+    axes: Sequence[str],
     codec: str = CODEC_NONE,
     compression: str = COMPRESSION_NONE,
     simplifier: Simplifier | str | None = None,
@@ -179,14 +179,13 @@ def build_collection(
     nothing here reads a slot as a physical axis -- meshes off a ``(z, y, x)`` volume stay
     ``(z, y, x)`` and are entirely consistent without any names at all.
 
-    ``axes`` names those three slots anyway, in slot order, and is written into the manifest
-    verbatim. It buys nothing *here* -- no code path reads it -- and everything one layer up:
-    it is the writer's record of what it was told the slots mean, which is the only thing a
-    consumer can check a caller's later re-declaration against. Left unset the manifest states
-    ``null``, and a consumer then has nothing to check against and must trust whatever it is
-    handed. **Pass it.** The mistake it exists to catch is declaring ``["z","y","x"]`` over
-    ``(x, y, z)`` vertices, which has no downstream symptom: a round trip is self-consistent
-    under either convention, and the result simply draws transposed.
+    ``axes`` names those three slots, in slot order, and is written into the manifest verbatim.
+    **It is required.** It buys nothing *here* -- no code path reads it -- and everything one
+    layer up: it is the writer's record of what the slots mean, and a consumer has no other way
+    to know. There is no default because every default is a guess: a viewer handed a collection
+    without one would have to assume an order, and assuming wrong has no symptom but a
+    transposed drawing -- a round trip is self-consistent under either convention. The mistake
+    it catches is declaring ``["z","y","x"]`` over ``(x, y, z)`` vertices.
 
     ``cell_size`` is the level-0 cell in voxels, ``(x, y, z)``. **Left unset it is chosen from
     the objects** by :func:`choose_cell_size` -- pass it when you know the source array's chunk
@@ -199,7 +198,8 @@ def build_collection(
     state wrong, and this one is a fact about the bytes.
 
     ``simplifier`` is how a coarse level is made, and like ``codec`` it is a name out of a small
-    vocabulary: ``"QUADRIC"`` (the default -- quadric-optimal shapes with the boundary pinned) or
+    vocabulary: ``"MESHOPT"`` (the default -- exactly this level's cell planes locked, no vertex
+    moved), ``"QUADRIC"`` (quadric-optimal shapes, the whole topological boundary pinned) or
     ``"GREEDY"``. Pass an instance instead -- ``fabriks.GreedyEdgeCollapse(placement="onto_fixed")``
     -- to adjust a backend's own settings, or your own object providing ``simplify``. See
     :mod:`fabriks.simplifiers`. ``decimation`` is how much survives each level,
@@ -214,6 +214,8 @@ def build_collection(
     # costing the whole clipping pass -- and the same for a missing optional codec and for
     # `axes`, which the manifest would otherwise not check until every mesh had been cut.
     Encoding(codec=codec, compression=compression)
+    if axes is None:  # pyright: ignore[reportUnnecessaryComparison]  -- untyped callers still pass it
+        raise TypeError("build_collection needs `axes=`: the names of the three vertex slots, in slot order. Without them the manifest could only be read by guessing which slot is which.")
     _read_axes(axes)  # unlaundered: `list("xyz")` would pass a string off as three names
     if codec == CODEC_MESHOPT:
         from fabriks.codecs import require_meshoptimizer
@@ -489,7 +491,7 @@ def build_collection(
         grid=grid,
         encoding=Encoding(codec=codec, compression=compression, decimation=schedule.declaration),
         shape=_shape_of(collection_low, collection_high),
-        axes=None if axes is None else tuple(axes),  # type: ignore[arg-type]
+        axes=tuple(axes),  # type: ignore[arg-type]
         counts={
             "objects": len(object_ids),
             "cellsPerLevel": [len(per_level[level]) for level in range(levels)],

@@ -107,17 +107,19 @@ _RETRIANGULATION = 2
 
 #: How far the level-0 model is trusted, as a fraction. Level 0 is arithmetic rather than a
 #: guess, but "arithmetic" is not "to the byte": the clip is trimesh's rather than a formula, and
-#: welding merges vertices across a fragment this cannot see. Measured within 12% of real builds
-#: across three scenes and six cell sizes, on both the whole layer and the percentile the budget
-#: is set on; 15% is the headroom that leaves.
-_MODEL_TOLERANCE = 0.15
+#: welding merges vertices across a fragment this cannot see. The bisecting clip cuts a cell's
+#: planes in a different order than one cut-out per cell did, and triangulates an axis-aligned
+#: face crossed by several planes into a few percent more pieces: the box scene's densest cell
+#: now lands up to 19% over the calibrated model, where a smooth surface is unchanged. 20% is the
+#: headroom that leaves, on both the whole layer and the percentile the budget is set on.
+_MODEL_TOLERANCE = 0.20
 
-#: A constant the model is scaled by, because it under-counts by a consistent tenth and a
+#: A constant the model is scaled by, because it under-counts by a consistent seventh and a
 #: consistent bias is worth removing rather than hiding inside the tolerance. The bias is
 #: one-directional for a reason: every unmodelled effect here *adds* geometry -- a clipped
 #: triangle fans into slightly more than three pieces, and a fragment's boundary carries vertices
 #: that the closed-surface arithmetic pairs off.
-_CALIBRATION = 1.10
+_CALIBRATION = 1.14
 
 #: How many cells along one axis a single face is expanded into at most. Sixteen because that is
 #: where the estimate stops improving: below it, scenes built from a few very large triangles
@@ -176,7 +178,7 @@ class GridPlan:
     Splat it straight into a build::
 
         plan = fabriks.plan_grid(objects, cell_bytes=8 * 1024)
-        collection = fabriks.build_collection(objects, **plan.as_kwargs())
+        collection = fabriks.build_collection(objects, axes=("x", "y", "z"), **plan.as_kwargs())
 
     It is worth printing :meth:`describe` first. The plan reports where it had to override the
     budget -- ``object_fit`` is the cell size below which objects start being cut, and a byte
