@@ -1,26 +1,38 @@
 """Which backend a name selects, and the retry policy every backend is driven through.
 
 ``simplification`` is a *value*, the way ``codec`` is: a name from a vocabulary the format
-defines, resolved to an implementation here. ``MESHOPT`` is the default. Adding a backend is a
+defines, resolved to an implementation here. ``MESHOPT`` is the default where meshoptimizer is
+installed (the ``meshopt`` extra), ``QUADRIC`` otherwise. Adding a backend is a
 module beside this one and an entry in the table -- and passing an instance stays available for
 the cases where the defaults need adjusting.
 """
 
 from __future__ import annotations
 
+import importlib.util
 from typing import Any
 
 import numpy as np
 import numpy.typing as npt
 
+from fabriks.codecs.meshopt import require_meshoptimizer
 from fabriks.errors import FormatError
 from fabriks.simplifiers.greedy import SIMPLIFICATION_GREEDY, GreedyEdgeCollapse
 from fabriks.simplifiers.meshopt import SIMPLIFICATION_MESHOPT, MeshoptSimplifier
 from fabriks.simplifiers.protocol import Simplified, Simplifier
 from fabriks.simplifiers.quadric import SIMPLIFICATION_QUADRIC, QuadricSimplifier
 
-#: The backend used when none is named: the one that pins exactly the cell planes and no more.
-SIMPLIFICATION_DEFAULT = SIMPLIFICATION_MESHOPT
+
+def default_simplification() -> str:
+    """The backend used when none is named.
+
+    ``MESHOPT`` -- the one that pins exactly the cell planes and no more -- where meshoptimizer is
+    installed (``fabriks[meshopt]``); ``QUADRIC`` otherwise. meshoptimizer is an extra because it
+    ships as source only, and a mesh collection should not need a compiler to be built.
+    """
+    if importlib.util.find_spec("meshoptimizer") is not None:
+        return SIMPLIFICATION_MESHOPT
+    return SIMPLIFICATION_QUADRIC
 
 #: Every backend that ships, keyed by the ``simplification`` value that selects it.
 _SIMPLIFIERS: dict[str, type[Simplifier]] = {
@@ -43,6 +55,8 @@ def simplifier_for(simplification: str) -> Simplifier:
         raise FormatError(
             f"`simplification` is {simplification!r}; fabriks ships {', '.join(sorted(_SIMPLIFIERS))}."
         ) from None
+    if simplification == SIMPLIFICATION_MESHOPT:
+        require_meshoptimizer(f"`simplifier={SIMPLIFICATION_MESHOPT!r}`")
     return factory()
 
 
@@ -53,7 +67,7 @@ def resolve_simplifier(simplifier: Any) -> Simplifier:  # noqa: ANN401
     vocabulary, or an instance they have configured themselves.
     """
     if simplifier is None:
-        return simplifier_for(SIMPLIFICATION_DEFAULT)
+        return simplifier_for(default_simplification())
     if isinstance(simplifier, str):
         return simplifier_for(simplifier)
     if not hasattr(simplifier, "simplify"):
@@ -105,7 +119,7 @@ def simplify_to_target(
 
 
 __all__ = [
-    "SIMPLIFICATION_DEFAULT",
+    "default_simplification",
     "resolve_simplifier",
     "simplifier_for",
     "simplify_to_target",

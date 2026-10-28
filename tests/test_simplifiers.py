@@ -425,3 +425,30 @@ def test_the_face_floor_is_configurable():
     assert schedule.target_faces(1000, 0) == 1000
     assert schedule.target_faces(1000, 3) == 32, "the floor, not 15"
     assert fabriks.Decimation.quarter().target_faces(1000, 3) == 16
+
+
+def test_without_meshoptimizer_the_default_is_quadric_and_meshopt_says_what_to_install(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """meshoptimizer is an extra (it builds from source): an install without it still simplifies."""
+    import sys
+
+    assert fabriks.default_simplification() == "MESHOPT"
+    monkeypatch.setitem(sys.modules, "meshoptimizer", None)
+
+    assert fabriks.default_simplification() == "QUADRIC"
+    assert fabriks.simplifiers.resolve_simplifier(None).name == "QUADRIC"
+    with pytest.raises(fabriks.MissingExtraError, match=r"fabriks\[meshopt\]"):
+        fabriks.simplifiers.resolve_simplifier("MESHOPT")
+
+
+def test_a_collection_builds_without_meshoptimizer(objects: dict, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The whole build -- clip, simplify, encode, write, read back -- with no compiled extra at all."""
+    import sys
+
+    monkeypatch.setitem(sys.modules, "meshoptimizer", None)
+    collection = fabriks.build_collection(objects, cell_size=(128, 128, 64), levels=2, axes=("x", "y", "z"))
+
+    store = fabriks.MemoryStore()
+    fabriks.write_collection(collection, store, "c")
+    assert fabriks.open_collection(store, "c").object_mesh(next(iter(objects)), level=1) is not None

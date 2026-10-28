@@ -8,8 +8,8 @@ readme = "README.md"
 license = "MIT"
 # fabriks builds mesh collections, so everything that takes part in building one is a
 # dependency rather than an extra. `trimesh` cuts a mesh at the cell planes and
-# `meshoptimizer` makes the coarse levels (`fast-simplification` backs the QUADRIC alternative);
-# only reaching a remote store is optional.
+# `fast-simplification` makes the coarse levels (QUADRIC); reaching a remote store and the
+# MESHOPT simplifier and codec are optional.
 #
 # scipy and shapely are named because trimesh does not require them and the clipper does.
 # trimesh hard-depends on numpy alone -- both of these sit in its `easy` extra -- while
@@ -23,18 +23,19 @@ dependencies = [
     "scipy>=1.11",
     "shapely>=2.0",
     "fast-simplification>=0.1.7",
-    # The MESHOPT simplifier declares `meshopt_simplifyWithAttributes` with its `vertex_lock`
-    # argument itself (the binding leaves it undeclared), so the bundled library must have it.
-    # Every published binding is a pre-release, hence the pre-release floor. It also provides
-    # `codec: MESHOPT`.
-    "meshoptimizer>=0.2.30a0",
 ]
 
 [project.optional-dependencies]
 # Writing to S3 (or anywhere else obstore reaches). fabriks only needs three methods off a
 # store, so this is for callers who want one rather than a directory.
 obstore = ["obstore>=0.10"]
-complete = ["obstore>=0.10"]
+# `simplification: MESHOPT` (the default when it is installed) and `codec: MESHOPT`. An extra
+# because PyPI ships meshoptimizer as source only: installing it needs a C++ compiler, which a
+# slim image does not have. The MESHOPT simplifier declares `meshopt_simplifyWithAttributes`
+# with its `vertex_lock` argument itself (the binding leaves it undeclared), so the bundled
+# library must have it; every published binding is a pre-release, hence the pre-release floor.
+meshopt = ["meshoptimizer>=0.2.30a0"]
+complete = ["obstore>=0.10", "meshoptimizer>=0.2.30a0"]
 
 [tool.uv]
 dev-dependencies = [

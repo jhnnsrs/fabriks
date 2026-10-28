@@ -1,8 +1,8 @@
 """``codec: MESHOPT`` -- meshoptimizer's vertex and index codecs.
 
-Trades a decoder on the reading side for size. ``meshoptimizer`` is a dependency of fabriks (it
-also backs ``simplification: MESHOPT``), but the name is still only resolved when a manifest
-actually asks for this codec, so a broken install fails there with a message saying so.
+Trades a decoder on the reading side for size. ``meshoptimizer`` is the ``meshopt`` extra (it
+also backs ``simplification: MESHOPT``), resolved only when a manifest actually asks for this
+codec, so an install without it fails there with a message saying so.
 
 The declared ``compression`` never reaches these methods: ``MESHOPT`` with ``ZSTD`` is refused
 when the manifest is validated -- a compressed frame carries no reliable length and a meshopt
@@ -26,15 +26,15 @@ from fabriks.manifest import CODEC_MESHOPT, CODEC_NONE
 STRIDE = 8
 
 
-def require_meshoptimizer() -> Any:  # noqa: ANN401
+def require_meshoptimizer(what: str = f"`codec={CODEC_MESHOPT!r}`") -> Any:  # noqa: ANN401
     """Import meshoptimizer, saying what asked for it when the install is missing it."""
     try:
         import meshoptimizer  # type: ignore
-    except ImportError as error:  # pragma: no cover - depends on the environment
+    except ImportError as error:
         raise MissingExtraError(
-            f"`codec={CODEC_MESHOPT!r}` needs meshoptimizer, a dependency of fabriks that is missing from this "
-            f"environment: reinstall fabriks. The format's default is `codec={CODEC_NONE!r}`, which writes the "
-            f"blobs raw and needs nothing."
+            f"{what} needs meshoptimizer, which is not installed: install `fabriks[meshopt]` (it builds from "
+            f"source, so it needs a C++ compiler). Without it the default simplifier is "
+            f"`simplifier='QUADRIC'` and the default codec `codec={CODEC_NONE!r}`, which need nothing."
         ) from error
     return meshoptimizer
 

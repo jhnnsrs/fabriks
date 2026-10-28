@@ -361,7 +361,6 @@ name = "fabriks"
 source = { editable = "." }
 dependencies = [
     { name = "fast-simplification" },
-    { name = "meshoptimizer" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "numpy", version = "2.5.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "pyarrow" },
@@ -373,7 +372,11 @@ dependencies = [
 
 [package.optional-dependencies]
 complete = [
+    { name = "meshoptimizer" },
     { name = "obstore" },
+]
+meshopt = [
+    { name = "meshoptimizer" },
 ]
 obstore = [
     { name = "obstore" },
@@ -393,7 +396,8 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fast-simplification", specifier = ">=0.1.7" },
-    { name = "meshoptimizer", specifier = ">=0.2.30a0" },
+    { name = "meshoptimizer", marker = "extra == 'complete'", specifier = ">=0.2.30a0" },
+    { name = "meshoptimizer", marker = "extra == 'meshopt'", specifier = ">=0.2.30a0" },
     { name = "numpy", specifier = ">=1.26" },
     { name = "obstore", marker = "extra == 'complete'", specifier = ">=0.10" },
     { name = "obstore", marker = "extra == 'obstore'", specifier = ">=0.10" },
@@ -402,7 +406,7 @@ requires-dist = [
     { name = "shapely", specifier = ">=2.0" },
     { name = "trimesh", specifier = ">=4.0" },
 ]
-provides-extras = ["complete", "obstore"]
+provides-extras = ["complete", "meshopt", "obstore"]
 
 [package.metadata.requires-dev]
 dev = [

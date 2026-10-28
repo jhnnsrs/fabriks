@@ -5,7 +5,7 @@ pins exactly the vertices in ``fixed`` and nothing else. :class:`~fabriks.simpli
 can only say ``preserve_border``, which pins the whole topological boundary -- inherited level-0
 seams included -- and so stalls short of the budget on a heavily cut object.
 
-meshoptimizer is a dependency of fabriks, but it is reached through the binding's private loader,
+meshoptimizer is the ``meshopt`` extra of fabriks, and it is reached through the binding's private loader,
 so it is resolved on the first simplify rather than on ``import fabriks``: a reader that never
 builds a collection never touches it.
 """

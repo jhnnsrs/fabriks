@@ -7,14 +7,15 @@ two-fold: hit a face budget (``decimation``), and leave the cut boundary exactly
 Everything else about *how* is a choice, so the backend is named the way a codec is -- a value
 out of a small vocabulary, resolved to an implementation -- rather than a hardcoded loop::
 
-    fabriks.build_collection(objects, cell_size=...)                      # MESHOPT, the default
+    fabriks.build_collection(objects, cell_size=...)                      # MESHOPT if installed, else QUADRIC
     fabriks.build_collection(objects, cell_size=..., simplifier="GREEDY")
     fabriks.build_collection(objects, cell_size=..., simplifier=fabriks.GreedyEdgeCollapse(placement="onto_fixed"))
 
 Three backends ship:
 
 ``MESHOPT`` (:class:`~fabriks.simplifiers.meshopt.MeshoptSimplifier`)
-    The default, backed by `meshoptimizer <https://github.com/zeux/meshoptimizer>`_'s
+    The default where it is installed (``fabriks[meshopt]``; it builds from source), backed by
+    `meshoptimizer <https://github.com/zeux/meshoptimizer>`_'s
     ``simplifyWithAttributes``. Its ``vertex_lock`` pins **exactly** the ``fixed`` mask -- this
     level's cell planes -- and it never repositions a vertex, so every survivor keeps its exact
     input position. That is the format's constraint stated directly, where ``QUADRIC`` can only
@@ -49,14 +50,13 @@ from fabriks.simplifiers.meshopt import SIMPLIFICATION_MESHOPT, MeshoptSimplifie
 from fabriks.simplifiers.protocol import Simplified, Simplifier
 from fabriks.simplifiers.quadric import SIMPLIFICATION_QUADRIC, QuadricSimplifier
 from fabriks.simplifiers.registry import (
-    SIMPLIFICATION_DEFAULT,
+    default_simplification,
     resolve_simplifier,
     simplifier_for,
     simplify_to_target,
 )
 
 __all__ = [
-    "SIMPLIFICATION_DEFAULT",
     "SIMPLIFICATION_GREEDY",
     "SIMPLIFICATION_MESHOPT",
     "SIMPLIFICATION_QUADRIC",
@@ -66,6 +66,7 @@ __all__ = [
     "Simplified",
     "Simplifier",
     "boundary_held",
+    "default_simplification",
     "measure_deviation",
     "pinned_held",
     "resolve_simplifier",

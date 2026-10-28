@@ -198,8 +198,8 @@ def build_collection(
     state wrong, and this one is a fact about the bytes.
 
     ``simplifier`` is how a coarse level is made, and like ``codec`` it is a name out of a small
-    vocabulary: ``"MESHOPT"`` (the default -- exactly this level's cell planes locked, no vertex
-    moved), ``"QUADRIC"`` (quadric-optimal shapes, the whole topological boundary pinned) or
+    vocabulary: ``"MESHOPT"`` (the default with ``fabriks[meshopt]`` -- exactly this level's cell
+    planes locked, no vertex moved), ``"QUADRIC"`` (the default without it ; quadric-optimal shapes, the whole topological boundary pinned) or
     ``"GREEDY"``. Pass an instance instead -- ``fabriks.GreedyEdgeCollapse(placement="onto_fixed")``
     -- to adjust a backend's own settings, or your own object providing ``simplify``. See
     :mod:`fabriks.simplifiers`. ``decimation`` is how much survives each level,

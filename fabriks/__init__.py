@@ -62,7 +62,8 @@ and mesh cells pulls the same regions.
 Simplification
 --------------
 A coarse level is made by a pluggable backend, named the way a codec is: ``"MESHOPT"`` is the
-default, backed by ``meshoptimizer`` -- it locks exactly the vertices on this level's cell planes
+default where ``meshoptimizer`` is installed (``fabriks[meshopt]``), ``"QUADRIC"`` otherwise.
+MESHOPT locks exactly the vertices on this level's cell planes
 and never repositions a vertex, so every survivor is at exactly its input position, which is what
 makes ``boundary: LOCKED`` provable rather than intended. ``"QUADRIC"`` (``fast-simplification``)
 moves interior vertices to the quadric-optimal shape but pins the whole topological boundary;
@@ -145,7 +146,6 @@ from fabriks.reader import (
     open_collection,
 )
 from fabriks.simplifiers import (
-    SIMPLIFICATION_DEFAULT,
     SIMPLIFICATION_GREEDY,
     SIMPLIFICATION_MESHOPT,
     SIMPLIFICATION_QUADRIC,
@@ -154,6 +154,7 @@ from fabriks.simplifiers import (
     QuadricSimplifier,
     Simplified,
     Simplifier,
+    default_simplification,
     simplifier_for,
 )
 from fabriks.sizing import (
@@ -198,7 +199,6 @@ __all__ = [
     "POSITIONS_UINT16_QUANTIZED_PER_CELL",
     "QUANT_MAX",
     "REQUIRED_COLUMNS",
-    "SIMPLIFICATION_DEFAULT",
     "SIMPLIFICATION_GREEDY",
     "SIMPLIFICATION_MESHOPT",
     "SIMPLIFICATION_QUADRIC",
@@ -252,6 +252,7 @@ __all__ = [
     "decimate_fixed",
     "decode_indices",
     "decode_positions",
+    "default_simplification",
     "encode_indices",
     "encode_positions",
     "level_part_path",
