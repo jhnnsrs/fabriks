@@ -53,8 +53,8 @@ from fabriks.manifest import (
     Encoding,
     Grid,
     Manifest,
-    _read_axes,
     level_part_path,
+    read_axes,
 )
 from fabriks.octree import cell_box, morton_decode, morton_encode_one
 from fabriks.simplifiers import Simplifier, resolve_simplifier, simplify_to_target
@@ -216,7 +216,7 @@ def build_collection(
     Encoding(codec=codec, compression=compression)
     if axes is None:  # pyright: ignore[reportUnnecessaryComparison]  -- untyped callers still pass it
         raise TypeError("build_collection needs `axes=`: the names of the three vertex slots, in slot order. Without them the manifest could only be read by guessing which slot is which.")
-    _read_axes(axes)  # unlaundered: `list("xyz")` would pass a string off as three names
+    read_axes(axes)  # unlaundered: `list("xyz")` would pass a string off as three names
     if codec == CODEC_MESHOPT:
         from fabriks.codecs import require_meshoptimizer
 

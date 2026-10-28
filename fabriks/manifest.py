@@ -422,7 +422,7 @@ def _read_shape(raw: Any) -> tuple[int, int, int] | None:  # noqa: ANN401
     return sizes  # type: ignore[return-value]
 
 
-def _read_axes(raw: Any) -> tuple[str, str, str] | None:  # noqa: ANN401
+def read_axes(raw: Any) -> tuple[str, str, str] | None:  # noqa: ANN401
     """Read a manifest's ``axes``, refusing names that cannot label the three vertex slots.
 
     ``None`` is legitimate. Nothing in the format decodes through ``axes`` -- every component is
@@ -456,7 +456,7 @@ class Manifest:
     def __post_init__(self) -> None:
         """Refuse a shape or an axis naming that cannot describe three positional slots."""
         object.__setattr__(self, "shape", _read_shape(self.shape))
-        object.__setattr__(self, "axes", _read_axes(self.axes))
+        object.__setattr__(self, "axes", read_axes(self.axes))
 
     def to_dict(self) -> dict[str, Any]:
         """The manifest as it is written, with the resolved declarations rather than the input.
@@ -505,7 +505,7 @@ class Manifest:
             encoding=Encoding.from_dict(encoding),
             spec_version=version,
             shape=_read_shape(raw.get("shape")),
-            axes=_read_axes(raw.get("axes")),
+            axes=read_axes(raw.get("axes")),
             counts=dict(raw.get("counts") or {}),
             files=dict(raw.get("files") or {}),
         )
