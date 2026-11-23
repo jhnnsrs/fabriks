@@ -40,7 +40,9 @@ def test_the_column_types_are_the_ones_a_describe_would_print():
     )
 
 
-def test_the_built_frames_match_the_declared_schemas(collection: fabriks.MeshCollection):
+def test_the_built_frames_match_the_declared_schemas(
+    collection: fabriks.MeshCollection,
+):
     """What the builder produces is what the schemas promise."""
     schemas = arrow_schemas()
 

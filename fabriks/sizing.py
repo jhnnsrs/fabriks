@@ -201,7 +201,9 @@ class GridPlan:
 
     def __post_init__(self) -> None:
         """Refuse a plan that could not be built from."""
-        if len(self.cell_size) != 3 or any(int(component) < 1 for component in self.cell_size):
+        if len(self.cell_size) != 3 or any(
+            int(component) < 1 for component in self.cell_size
+        ):
             raise FormatError(
                 f"`cell_size` is three whole numbers of at least 1 voxel, got {self.cell_size!r}."
             )
@@ -268,7 +270,9 @@ def _unit_aspect(aspect: Sequence[int] | None) -> npt.NDArray[np.float64]:
 
 def _linear_key(cells: npt.NDArray[np.int64]) -> npt.NDArray[np.int64]:
     """One integer per ``(i, j, k)`` triple, for grouping. Not a Morton code -- order is unused."""
-    return (cells[:, 0] << (2 * MORTON_BITS)) | (cells[:, 1] << MORTON_BITS) | cells[:, 2]
+    return (
+        (cells[:, 0] << (2 * MORTON_BITS)) | (cells[:, 1] << MORTON_BITS) | cells[:, 2]
+    )
 
 
 @dataclass(frozen=True)
@@ -323,7 +327,9 @@ def _bin_faces(meshes: Mapping[int, Mesh], base: npt.NDArray[np.float64]) -> _Bi
         faces_seen += len(faces)
 
     if not span_low:
-        raise FormatError("Every object in the collection is empty; there is nothing to size a grid against.")
+        raise FormatError(
+            "Every object in the collection is empty; there is nothing to size a grid against."
+        )
 
     return _Binned(
         face_count=faces_seen,
@@ -382,7 +388,10 @@ def _measure(binned: _Binned, shift: int, percentile: float) -> _Rung:
     # Unique (cell, vertex) pairs, so a vertex shared by faces in the same cell is paid for once
     # and one shared across a cell plane is paid for in both -- which is what welding produces.
     pairs = np.unique(
-        np.stack([np.repeat(keys, 3), binned.vertex_ids[face_index].reshape(-1)], axis=1), axis=0
+        np.stack(
+            [np.repeat(keys, 3), binned.vertex_ids[face_index].reshape(-1)], axis=1
+        ),
+        axis=0,
     )
     _, vertex_counts = np.unique(pairs[:, 0], return_counts=True)
     vertices_per_cell = vertex_counts.astype(np.float64)
@@ -457,16 +466,24 @@ def plan_grid(
             still returned, with the reason in ``overrides``; nothing here is fatal.
     """
     if percentile < 0.0 or percentile > 100.0:
-        raise FormatError(f"`percentile` selects a cell between 0 and 100, got {percentile}.")
+        raise FormatError(
+            f"`percentile` selects a cell between 0 and 100, got {percentile}."
+        )
     for name, band in (("coarsening", coarsening), ("layer_shrink", layer_shrink)):
         if band[0] <= 0.0 or band[1] < band[0]:
-            raise FormatError(f"`{name}` is an ascending pair of positive factors, got {band!r}.")
+            raise FormatError(
+                f"`{name}` is an ascending pair of positive factors, got {band!r}."
+            )
     if max_levels < 1:
-        raise FormatError(f"An octree has at least one level, got `max_levels` of {max_levels}.")
+        raise FormatError(
+            f"An octree has at least one level, got `max_levels` of {max_levels}."
+        )
 
     meshes = coerce_objects(objects)
     if not meshes:
-        raise FormatError("A collection holds at least one object; there is nothing to size a grid against.")
+        raise FormatError(
+            "A collection holds at least one object; there is nothing to size a grid against."
+        )
 
     object_fit = choose_cell_size(meshes)
     unit = _unit_aspect(aspect)
@@ -512,9 +529,13 @@ def plan_grid(
     # a cell too small makes a cell key unrepresentable. Resolved here rather than discovered by
     # `morton_encode` partway through an expensive build.
     raised_from = size_at(chosen)
-    while chosen + 1 < ceiling and (
-        np.ceil(binned.extent / np.asarray(size_at(chosen), dtype=np.float64)) >= (1 << MORTON_BITS)
-    ).any():
+    while (
+        chosen + 1 < ceiling
+        and (
+            np.ceil(binned.extent / np.asarray(size_at(chosen), dtype=np.float64))
+            >= (1 << MORTON_BITS)
+        ).any()
+    ):
         chosen += 1
     if size_at(chosen) != raised_from:
         overrides.append(
@@ -531,7 +552,10 @@ def plan_grid(
     # while saving nothing. That is a warning rather than a clamp: clamping to
     # `choose_cell_size`'s answer, which deliberately overshoots at twice the 90th-percentile
     # object, would throw away the byte budget entirely and hand back a one-cell octree.
-    if (np.asarray(cell_size, dtype=np.float64) < np.asarray(object_fit, dtype=np.float64)).any():
+    if (
+        np.asarray(cell_size, dtype=np.float64)
+        < np.asarray(object_fit, dtype=np.float64)
+    ).any():
         overrides.append(
             f"cell {cell_size} is below the object fit {object_fit}, so objects will be cut and "
             f"their cut vertices pinned; expect the simplifier to fall short of QUARTER and the "
@@ -546,7 +570,10 @@ def plan_grid(
 
     levels = max_levels
     for step in range(max_levels):
-        if level0.total_bytes * (shrink_high**step) <= layer_bytes or rung_at(chosen + step).cells <= 1:
+        if (
+            level0.total_bytes * (shrink_high**step) <= layer_bytes
+            or rung_at(chosen + step).cells <= 1
+        ):
             levels = step + 1
             break
 
@@ -584,10 +611,13 @@ def plan_grid(
     # quantization is per cell, so `encode_positions` raises `PartitioningError`. Measured on one
     # scene at over a voxel outside. It is a writer bug rather than a planning one, but a plan is
     # the thing that would walk into it, so it is named here rather than discovered mid-build.
-    if levels >= _RISKY_LEVELS and (
-        np.asarray(cell_size, dtype=np.float64) * _RISKY_FIT_RATIO
-        < np.asarray(object_fit, dtype=np.float64)
-    ).any():
+    if (
+        levels >= _RISKY_LEVELS
+        and (
+            np.asarray(cell_size, dtype=np.float64) * _RISKY_FIT_RATIO
+            < np.asarray(object_fit, dtype=np.float64)
+        ).any()
+    ):
         overrides.append(
             f"{levels} levels on a cell of {cell_size}, well under the object fit {object_fit}, is "
             f"the regime where decimation is known to push a vertex outside its cell and the build "

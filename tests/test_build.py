@@ -33,12 +33,19 @@ def test_geometry_round_trips_through_an_anisotropic_grid(
 
     for object_id, source in objects.items():
         decoded = opened.object_mesh(object_id, level=0)
-        source_low, source_high = np.asarray(source.bounds[0]), np.asarray(source.bounds[1])
+        source_low, source_high = (
+            np.asarray(source.bounds[0]),
+            np.asarray(source.bounds[1]),
+        )
 
         # A quantum of the finest cell is the whole error budget for a level-0 vertex.
         quantum = np.asarray(CELL_SIZE, dtype=np.float64) / fabriks.QUANT_MAX
-        assert np.asarray(decoded.bounds[0]) == pytest.approx(source_low, abs=quantum.max() * 2)
-        assert np.asarray(decoded.bounds[1]) == pytest.approx(source_high, abs=quantum.max() * 2)
+        assert np.asarray(decoded.bounds[0]) == pytest.approx(
+            source_low, abs=quantum.max() * 2
+        )
+        assert np.asarray(decoded.bounds[1]) == pytest.approx(
+            source_high, abs=quantum.max() * 2
+        )
 
 
 def test_a_cell_addresses_the_box_its_geometry_actually_occupies(
@@ -71,17 +78,29 @@ def test_the_manifest_carries_the_shape_and_the_axes_it_was_told():
     ``shape`` is measured from the geometry. ``axes`` is what the caller declared the three
     vertex slots to be, written verbatim -- in whatever order, because the slots are positional.
     """
-    objects = {1: trimesh.creation.icosphere(radius=20.0).apply_translation([64.0, 64.0, 32.0])}
+    objects = {
+        1: trimesh.creation.icosphere(radius=20.0).apply_translation([64.0, 64.0, 32.0])
+    }
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        forward = fabriks.build_collection(objects, cell_size=(128, 128, 64), levels=2, axes=("x", "y", "z"))
+        forward = fabriks.build_collection(
+            objects, cell_size=(128, 128, 64), levels=2, axes=("x", "y", "z")
+        )
         named = fabriks.build_collection(
             objects, cell_size=(128, 128, 64), levels=2, axes=("z", "y", "x")
         )
 
     written = forward.manifest.to_dict()
-    assert set(written) == {"specVersion", "grid", "encoding", "counts", "files", "shape", "axes"}
+    assert set(written) == {
+        "specVersion",
+        "grid",
+        "encoding",
+        "counts",
+        "files",
+        "shape",
+        "axes",
+    }
     assert written["axes"] == ["x", "y", "z"]
     assert len(written["shape"]) == 3
     assert all(isinstance(size, int) and size > 0 for size in written["shape"])
@@ -92,7 +111,9 @@ def test_the_manifest_carries_the_shape_and_the_axes_it_was_told():
 
 def test_a_collection_is_never_built_without_naming_its_slots():
     """No default order: a viewer handed none would have to guess, and a wrong guess only transposes."""
-    objects = {1: trimesh.creation.icosphere(radius=20.0).apply_translation([64.0, 64.0, 32.0])}
+    objects = {
+        1: trimesh.creation.icosphere(radius=20.0).apply_translation([64.0, 64.0, 32.0])
+    }
 
     with pytest.raises(TypeError):
         fabriks.build_collection(objects, cell_size=(128, 128, 64), levels=2)  # type: ignore[call-arg]
@@ -110,20 +131,35 @@ def test_the_encoding_always_states_the_keys_a_decoder_cannot_infer(
     """
     encoding = collection.manifest.to_dict()["encoding"]
 
-    for key in ("positions", "indices", "codec", "compression", "boundary", "decimation"):
+    for key in (
+        "positions",
+        "indices",
+        "codec",
+        "compression",
+        "boundary",
+        "decimation",
+    ):
         assert encoding.get(key), f"the manifest left `{key}` for a reader to guess"
     assert encoding["boundary"] == fabriks.BOUNDARY_LOCKED
-    assert encoding["compression"] == fabriks.COMPRESSION_NONE, "declared only where it is applied"
+    assert encoding["compression"] == fabriks.COMPRESSION_NONE, (
+        "declared only where it is applied"
+    )
 
 
 def test_the_declared_codec_is_the_one_that_was_applied():
     """A declaration that does not match the bytes is a lie no check downstream could catch."""
-    objects = {1: trimesh.creation.icosphere(radius=20.0).apply_translation([64.0, 64.0, 32.0])}
+    objects = {
+        1: trimesh.creation.icosphere(radius=20.0).apply_translation([64.0, 64.0, 32.0])
+    }
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         raw = fabriks.build_collection(
-            objects, cell_size=(128, 128, 64), levels=2, codec=fabriks.CODEC_NONE, axes=("x", "y", "z")
+            objects,
+            cell_size=(128, 128, 64),
+            levels=2,
+            codec=fabriks.CODEC_NONE,
+            axes=("x", "y", "z"),
         )
 
     assert raw.manifest.encoding.codec == fabriks.CODEC_NONE
@@ -141,13 +177,19 @@ def test_object_ids_and_ordinals_follow_the_format(collection: fabriks.MeshColle
     ordinals = catalog.column("ordinal").to_pylist()
 
     assert ids == sorted(ids), "the object catalog is ordered by ascending id"
-    assert ordinals == list(range(len(ids))), "ordinals are dense and match the catalog's row order"
+    assert ordinals == list(range(len(ids))), (
+        "ordinals are dense and match the catalog's row order"
+    )
 
     for _, shard in collection.shards:
         for row in range(shard.num_rows):
             row_ids = shard.column("object_ids")[row].as_py()
-            assert row_ids == sorted(row_ids), "a cell lists its objects in ascending id order"
-            assert shard.column("object_ordinals")[row].as_py() == [ids.index(i) for i in row_ids]
+            assert row_ids == sorted(row_ids), (
+                "a cell lists its objects in ascending id order"
+            )
+            assert shard.column("object_ordinals")[row].as_py() == [
+                ids.index(i) for i in row_ids
+            ]
 
 
 def test_object_offsets_are_ascending_starts_into_the_concatenated_arrays(
@@ -168,7 +210,9 @@ def test_object_offsets_are_ascending_starts_into_the_concatenated_arrays(
             )
 
 
-def test_the_child_mask_names_the_children_that_exist(collection: fabriks.MeshCollection):
+def test_the_child_mask_names_the_children_that_exist(
+    collection: fabriks.MeshCollection,
+):
     """A planner descends on the mask alone, so a wrong bit is geometry never fetched."""
     store = fabriks.MemoryStore()
     fabriks.write_collection(collection, store, "c")
@@ -185,7 +229,9 @@ def test_the_child_mask_names_the_children_that_exist(collection: fabriks.MeshCo
 
         actual = {key for key in opened.cells if key[0] == entry.level - 1}
         claimed = set(entry.children())
-        parents = {(entry.level - 1, cell) for _, cell in actual if _is_child(cell, entry)}
+        parents = {
+            (entry.level - 1, cell) for _, cell in actual if _is_child(cell, entry)
+        }
         assert claimed == parents, "the mask disagrees with the level below"
 
 
@@ -269,7 +315,13 @@ def test_a_missed_quarter_budget_is_warned_about():
     }
 
     with pytest.warns(UserWarning, match="decimation: QUARTER"):
-        fabriks.build_collection(objects, cell_size=(4, 4, 4), levels=2, axes=("x", "y", "z"), simplifier="QUADRIC")
+        fabriks.build_collection(
+            objects,
+            cell_size=(4, 4, 4),
+            levels=2,
+            axes=("x", "y", "z"),
+            simplifier="QUADRIC",
+        )
 
 
 def test_choosing_a_cell_size_beats_a_cell_smaller_than_the_objects(objects: dict):
@@ -285,15 +337,21 @@ def test_choosing_a_cell_size_beats_a_cell_smaller_than_the_objects(objects: dic
     )
 
 
-def test_raw_vertex_and_face_arrays_are_accepted_without_trimesh_in_the_caller(objects: dict):
+def test_raw_vertex_and_face_arrays_are_accepted_without_trimesh_in_the_caller(
+    objects: dict,
+):
     """A caller who already has arrays should not need trimesh in their own code."""
     source = objects[3]
     pairs = {3: (np.asarray(source.vertices), np.asarray(source.faces))}
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        from_pair = fabriks.build_collection(pairs, cell_size=CELL_SIZE, levels=2, axes=("x", "y", "z"))
-        from_mesh = fabriks.build_collection({3: source}, cell_size=CELL_SIZE, levels=2, axes=("x", "y", "z"))
+        from_pair = fabriks.build_collection(
+            pairs, cell_size=CELL_SIZE, levels=2, axes=("x", "y", "z")
+        )
+        from_mesh = fabriks.build_collection(
+            {3: source}, cell_size=CELL_SIZE, levels=2, axes=("x", "y", "z")
+        )
 
     assert from_pair.cell_catalog.to_pylist() == from_mesh.cell_catalog.to_pylist()
 
@@ -302,11 +360,15 @@ def test_faces_that_do_not_belong_to_their_vertices_are_refused():
     """Caught at coercion, where the message can still name the object."""
     with pytest.raises(ValueError, match="Object 4"):
         fabriks.build_collection(
-            {4: (np.zeros((3, 3)), np.array([[0, 1, 9]]))}, cell_size=CELL_SIZE, axes=("x", "y", "z")
+            {4: (np.zeros((3, 3)), np.array([[0, 1, 9]]))},
+            cell_size=CELL_SIZE,
+            axes=("x", "y", "z"),
         )
 
 
-def test_lod_error_is_per_cell_rather_than_per_level(collection: fabriks.MeshCollection):
+def test_lod_error_is_per_cell_rather_than_per_level(
+    collection: fabriks.MeshCollection,
+):
     """A level-wide maximum would let one bad cell set the error for the whole level.
 
     ``lod_error`` is what a planner spends its budget against, so a single badly decimated cell
@@ -357,17 +419,23 @@ def test_a_parents_error_dominates_its_childrens(collection: fabriks.MeshCollect
             )
 
 
-def test_level_zero_carries_only_the_quantization_error(collection: fabriks.MeshCollection):
+def test_level_zero_carries_only_the_quantization_error(
+    collection: fabriks.MeshCollection,
+):
     """Nothing is decimated at level 0, so its error is the quantization step and nothing else."""
     catalog = collection.cell_catalog
     expected = max(collection.grid.cell_extent(0)) / fabriks.QUANT_MAX
 
     for row in range(catalog.num_rows):
         if catalog.column("level")[row].as_py() == 0:
-            assert catalog.column("lod_error")[row].as_py() == pytest.approx(expected, rel=1e-9)
+            assert catalog.column("lod_error")[row].as_py() == pytest.approx(
+                expected, rel=1e-9
+            )
 
 
-def test_tightening_the_budget_never_coarsens_a_region(collection: fabriks.MeshCollection):
+def test_tightening_the_budget_never_coarsens_a_region(
+    collection: fabriks.MeshCollection,
+):
     """The property the parent-dominates-children rule exists to establish.
 
     Not "the plan keeps covering everything" -- that holds for other reasons and is checked
@@ -432,11 +500,17 @@ def test_the_component_order_is_the_callers_and_fabriks_never_interprets_it():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         forward = fabriks.build_collection(
-            {7: (vertices, faces)}, cell_size=(128, 128, 64), levels=3, axes=("x", "y", "z")
+            {7: (vertices, faces)},
+            cell_size=(128, 128, 64),
+            levels=3,
+            axes=("x", "y", "z"),
         )
         # The same scene in the reverse order: components reversed, cell size and slot names with them.
         reversed_ = fabriks.build_collection(
-            {7: (vertices[:, ::-1], faces)}, cell_size=(64, 128, 128), levels=3, axes=("z", "y", "x")
+            {7: (vertices[:, ::-1], faces)},
+            cell_size=(64, 128, 128),
+            levels=3,
+            axes=("z", "y", "x"),
         )
 
     assert [shard.num_rows for _, shard in forward.shards] == [
@@ -479,10 +553,15 @@ def test_the_component_order_changes_the_partition_and_never_the_geometry():
     objects = {1: (np.asarray(source.vertices), np.asarray(source.faces))}
 
     decoded = {}
-    for label, cell_size in (("matched", (128, 128, 512)), ("reversed", (512, 128, 128))):
+    for label, cell_size in (
+        ("matched", (128, 128, 512)),
+        ("reversed", (512, 128, 128)),
+    ):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            collection = fabriks.build_collection(objects, cell_size=cell_size, levels=1, axes=("x", "y", "z"))
+            collection = fabriks.build_collection(
+                objects, cell_size=cell_size, levels=1, axes=("x", "y", "z")
+            )
         store = fabriks.MemoryStore()
         fabriks.write_collection(collection, store, "c")
         decoded[label] = (

@@ -30,7 +30,10 @@ def test_opening_reads_the_manifest_and_nothing_else(written: fabriks.MemoryStor
     assert store.reads == ["collection/fabriks.json"]
 
     collection.cells  # noqa: B018 - the access is the point
-    assert store.reads == ["collection/fabriks.json", "collection/catalog/cells.parquet"]
+    assert store.reads == [
+        "collection/fabriks.json",
+        "collection/catalog/cells.parquet",
+    ]
 
 
 def test_the_declarations_survive_the_round_trip(
@@ -44,7 +47,9 @@ def test_the_declarations_survive_the_round_trip(
     assert opened.manifest.counts["objects"] == collection.object_catalog.num_rows
 
 
-def test_the_cell_catalog_answers_which_cells_without_opening_geometry(opened: fabriks.Collection):
+def test_the_cell_catalog_answers_which_cells_without_opening_geometry(
+    opened: fabriks.Collection,
+):
     """The whole reason the spatial index is a separate file."""
     assert len(opened.cells) > 0
     assert {entry.level for entry in opened.cells.values()} == set(range(LEVELS))
@@ -64,7 +69,9 @@ def test_a_cell_decodes_into_the_geometry_it_declares(opened: fabriks.Collection
         assert len(cell.vertices) == entry.vertex_count
         assert len(cell.faces) * 3 == entry.index_count
         assert len(cell.object_ids) == entry.object_count
-        assert cell.faces.max() < len(cell.vertices), "an index points past the cell's vertices"
+        assert cell.faces.max() < len(cell.vertices), (
+            "an index points past the cell's vertices"
+        )
 
 
 def test_a_cells_bounds_match_the_geometry_it_holds(opened: fabriks.Collection):
@@ -102,7 +109,9 @@ def test_one_object_can_be_isolated_out_of_a_shared_cell(opened: fabriks.Collect
     assert total == len(cell.faces), "the objects' faces do not add up to the cell's"
 
 
-def test_asking_a_cell_for_an_object_it_does_not_hold_says_so(opened: fabriks.Collection):
+def test_asking_a_cell_for_an_object_it_does_not_hold_says_so(
+    opened: fabriks.Collection,
+):
     """A KeyError naming what is there beats an IndexError from a slice."""
     entry = next(iter(opened.cells.values()))
     cell = opened.read_cell(entry.level, entry.cell)
@@ -111,7 +120,9 @@ def test_asking_a_cell_for_an_object_it_does_not_hold_says_so(opened: fabriks.Co
         cell.object_mesh(999999)
 
 
-def test_the_object_catalog_answers_where_an_object_is(opened: fabriks.Collection, objects: dict):
+def test_the_object_catalog_answers_where_an_object_is(
+    opened: fabriks.Collection, objects: dict
+):
     """The inverted index doing its one job: a lookup rather than a scan."""
     assert set(opened.objects) == set(objects)
 
@@ -156,7 +167,9 @@ def test_asking_for_an_object_that_is_not_there_says_so(opened: fabriks.Collecti
         opened.cells_for_object(424242)
 
 
-def test_children_are_read_off_the_mask_without_touching_the_catalog(opened: fabriks.Collection):
+def test_children_are_read_off_the_mask_without_touching_the_catalog(
+    opened: fabriks.Collection,
+):
     """Descending has to be free, or the octree costs more than it saves."""
     for entry in opened.cells.values():
         for key in entry.children():
@@ -172,13 +185,17 @@ def test_the_roots_are_the_coarsest_level(opened: fabriks.Collection):
     assert all(entry.level == LEVELS - 1 for entry in roots)
 
 
-def test_reading_a_cell_that_is_not_there_says_which_level_was_asked(opened: fabriks.Collection):
+def test_reading_a_cell_that_is_not_there_says_which_level_was_asked(
+    opened: fabriks.Collection,
+):
     """An error that names the level saves a round of guessing."""
     with pytest.raises(KeyError, match="Level 0 holds no cell"):
         opened.read_cell(0, 999999)
 
 
-def test_a_collection_can_be_opened_at_the_root_of_a_store(collection: fabriks.MeshCollection):
+def test_a_collection_can_be_opened_at_the_root_of_a_store(
+    collection: fabriks.MeshCollection,
+):
     """A granted prefix is usually already rooted at the collection, so the prefix is empty."""
     store = fabriks.MemoryStore()
     fabriks.write_collection(collection, store)
@@ -189,7 +206,9 @@ def test_a_collection_can_be_opened_at_the_root_of_a_store(collection: fabriks.M
     assert len(opened.cells) == collection.cell_catalog.num_rows
 
 
-def test_a_prefix_with_no_manifest_at_all_is_refused(collection: fabriks.MeshCollection):
+def test_a_prefix_with_no_manifest_at_all_is_refused(
+    collection: fabriks.MeshCollection,
+):
     """An empty prefix is an unfinished upload, not an empty collection."""
     with pytest.raises(fabriks.UnfinishedCollectionError):
         fabriks.open_collection(fabriks.MemoryStore(), "nothing-here")
@@ -222,7 +241,9 @@ def test_a_level_is_found_by_listing_when_the_manifest_does_not_name_its_parts(
     assert len(opened.read_cell(entry.level, entry.cell).vertices) == entry.vertex_count
 
 
-def test_the_listing_fallback_works_at_the_root_of_a_store(collection: fabriks.MeshCollection):
+def test_the_listing_fallback_works_at_the_root_of_a_store(
+    collection: fabriks.MeshCollection,
+):
     """The empty-prefix case is where the path arithmetic is easiest to get off by one."""
     store = fabriks.MemoryStore()
     fabriks.write_collection(collection, store)
@@ -253,8 +274,8 @@ def test_the_listing_fallback_still_finds_a_level_written_under_the_old_hive_nam
     stripped["files"] = {}
     store.objects["collection/fabriks.json"] = json.dumps(stripped).encode()
     for level in range(3):
-        store.objects[f"collection/level={level}/part-00000.parquet"] = store.objects.pop(
-            f"collection/level{level}/part-00000.parquet"
+        store.objects[f"collection/level={level}/part-00000.parquet"] = (
+            store.objects.pop(f"collection/level{level}/part-00000.parquet")
         )
 
     opened = fabriks.open_collection(store, "collection")
@@ -263,7 +284,9 @@ def test_the_listing_fallback_still_finds_a_level_written_under_the_old_hive_nam
     assert opened.geometry(0).num_rows == collection.shards[0][1].num_rows
 
 
-def test_a_level_with_nothing_stored_under_it_says_so(collection: fabriks.MeshCollection):
+def test_a_level_with_nothing_stored_under_it_says_so(
+    collection: fabriks.MeshCollection,
+):
     """A gap the manifest does not admit to is still a gap, and it is named rather than empty."""
     store = fabriks.MemoryStore()
     fabriks.write_collection(collection, store, "collection")

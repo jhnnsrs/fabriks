@@ -98,7 +98,9 @@ class MeshCollection:
         return write_collection(self, store, prefix)
 
 
-def choose_cell_size(objects: Mapping[int, Any], *, levels: int = 3) -> tuple[int, int, int]:
+def choose_cell_size(
+    objects: Mapping[int, Any], *, levels: int = 3
+) -> tuple[int, int, int]:
     """Pick a level-0 cell, in voxels, that most objects fit inside whole.
 
     **Prefer passing the source array's chunk shape when you know it.** ``cell_size`` is in
@@ -120,7 +122,9 @@ def choose_cell_size(objects: Mapping[int, Any], *, levels: int = 3) -> tuple[in
     Powers of two because a coarser cell is exactly two finer ones, so the level-0 planes stay a
     superset of every coarser level's -- which is what the boundary argument rests on.
     """
-    del levels  # part of the signature so a caller can pass it; the heuristic is level-free
+    del (
+        levels
+    )  # part of the signature so a caller can pass it; the heuristic is level-free
     if not objects:
         raise FormatError(
             "Cannot choose a cell size for an empty collection; pass `cell_size` explicitly."
@@ -142,7 +146,9 @@ def choose_cell_size(objects: Mapping[int, Any], *, levels: int = 3) -> tuple[in
     chosen = np.minimum(chosen, np.exp2(np.ceil(np.log2(np.maximum(extent, 1.0)))))
 
     def level0_cells(size: npt.NDArray[np.float64]) -> float:
-        return float(np.prod(np.maximum(np.ceil((upper - np.minimum(lower, 0.0)) / size), 1.0)))
+        return float(
+            np.prod(np.maximum(np.ceil((upper - np.minimum(lower, 0.0)) / size), 1.0))
+        )
 
     # Halve while the octree is doing too little work, but never below the object-fit size --
     # that is the constraint whose violation is silent.
@@ -215,7 +221,9 @@ def build_collection(
     # `axes`, which the manifest would otherwise not check until every mesh had been cut.
     Encoding(codec=codec, compression=compression)
     if axes is None:  # pyright: ignore[reportUnnecessaryComparison]  -- untyped callers still pass it
-        raise TypeError("build_collection needs `axes=`: the names of the three vertex slots, in slot order. Without them the manifest could only be read by guessing which slot is which.")
+        raise TypeError(
+            "build_collection needs `axes=`: the names of the three vertex slots, in slot order. Without them the manifest could only be read by guessing which slot is which."
+        )
     read_axes(axes)  # unlaundered: `list("xyz")` would pass a string off as three names
     if codec == CODEC_MESHOPT:
         from fabriks.codecs import require_meshoptimizer
@@ -251,15 +259,32 @@ def build_collection(
     # for why an odd 65535 makes that a separate step.
     coarse_extent = cell_size_array.astype(np.float64) * (2 ** (levels - 1))
     fragments_by_object: dict[
-        int, dict[tuple[int, int, int], tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.bool_]]]
+        int,
+        dict[
+            tuple[int, int, int],
+            tuple[
+                npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.bool_]
+            ],
+        ],
     ] = {}
     for object_id in object_ids:
-        fragments: dict[tuple[int, int, int], tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.bool_]]] = {}
-        for triple, fragment in clip_to_cells(meshes[object_id], cell_size_array).items():
+        fragments: dict[
+            tuple[int, int, int],
+            tuple[
+                npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.bool_]
+            ],
+        ] = {}
+        for triple, fragment in clip_to_cells(
+            meshes[object_id], cell_size_array
+        ).items():
             vertices, boundary = snap_boundary(
-                np.asarray(fragment.vertices, dtype=np.float64), cell_size_array, coarse_extent
+                np.asarray(fragment.vertices, dtype=np.float64),
+                cell_size_array,
+                coarse_extent,
             )
-            faces = drop_degenerate(vertices, np.asarray(fragment.faces, dtype=np.int64))
+            faces = drop_degenerate(
+                vertices, np.asarray(fragment.faces, dtype=np.int64)
+            )
             if len(faces) == 0:
                 continue
             fragments[triple] = (vertices, faces, boundary)
@@ -284,7 +309,9 @@ def build_collection(
     #
     # A level's representation is standalone: the whole object is decimated to that level's
     # budget and then split by the fragments' cells, never expressed as a delta on a finer one.
-    per_level: dict[int, dict[int, dict[int, tuple[npt.NDArray[np.float64], npt.NDArray[np.int64]]]]] = {}
+    per_level: dict[
+        int, dict[int, dict[int, tuple[npt.NDArray[np.float64], npt.NDArray[np.int64]]]]
+    ] = {}
     #: The simplifier's own estimate of how far it strayed, per ``(level, cell)`` -- the
     #: decimation half of that cell's ``lod_error``.
     displacement: dict[tuple[int, int], float] = {}
@@ -294,7 +321,9 @@ def build_collection(
     at_the_floor: dict[int, int] = {level: 0 for level in range(levels)}
 
     for level in range(levels):
-        level_cells: dict[int, dict[int, tuple[npt.NDArray[np.float64], npt.NDArray[np.int64]]]] = {}
+        level_cells: dict[
+            int, dict[int, tuple[npt.NDArray[np.float64], npt.NDArray[np.int64]]]
+        ] = {}
         level_extent = cell_size_array * (2**level)
         for object_id in object_ids:
             fragments = fragments_by_object[object_id]
@@ -305,7 +334,10 @@ def build_collection(
             # level. The eight children tile their parent exactly, so a coarse cell is
             # assembled by merging -- never by cutting again, which is what would move a
             # boundary and break LOCKED.
-            groups: dict[tuple[int, int, int], list[tuple[npt.NDArray[np.float64], npt.NDArray[np.int64]]]] = {}
+            groups: dict[
+                tuple[int, int, int],
+                list[tuple[npt.NDArray[np.float64], npt.NDArray[np.int64]]],
+            ] = {}
             for triple, (vertices, faces, _) in fragments.items():
                 coarse = tuple(int(component) // (2**level) for component in triple)
                 groups.setdefault(coarse, []).append((vertices, faces))
@@ -327,7 +359,9 @@ def build_collection(
                     # than the face floor, or when the piece is already under the target. Both
                     # are a different explanation for a missed budget than a boundary the
                     # simplifier may not spend, and the warning must not confuse them.
-                    at_floor = wanted_faces <= schedule.floor_faces or len(faces) <= target
+                    at_floor = (
+                        wanted_faces <= schedule.floor_faces or len(faces) <= target
+                    )
                     result, relaxed = simplify_to_target(
                         backend, vertices, faces, fixed=own_faces, target_faces=target
                     )
@@ -352,10 +386,16 @@ def build_collection(
     #: Each cell's resolved `lod_error`, filled level by level so a parent can dominate its
     #: children -- levels are assembled finest-first, so a child is always already in here.
     cell_errors: dict[tuple[int, int], float] = {}
-    object_cells: dict[int, list[dict[str, int]]] = {object_id: [] for object_id in object_ids}
-    object_totals: dict[int, tuple[int, int]] = {object_id: (0, 0) for object_id in object_ids}
+    object_cells: dict[int, list[dict[str, int]]] = {
+        object_id: [] for object_id in object_ids
+    }
+    object_totals: dict[int, tuple[int, int]] = {
+        object_id: (0, 0) for object_id in object_ids
+    }
     #: The (low, high) corner of each object's bounds, in voxels.
-    object_bounds: dict[int, tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]] = {}
+    object_bounds: dict[
+        int, tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]
+    ] = {}
     #: The (low, high) corner of everything written, in voxels -- what `shape` is derived from.
     collection_low: npt.NDArray[np.float64] | None = None
     collection_high: npt.NDArray[np.float64] | None = None
@@ -389,7 +429,10 @@ def build_collection(
                     low, high = vertices.min(axis=0), vertices.max(axis=0)
                     if object_id in object_bounds:
                         prev_low, prev_high = object_bounds[object_id]
-                        low, high = np.minimum(low, prev_low), np.maximum(high, prev_high)
+                        low, high = (
+                            np.minimum(low, prev_low),
+                            np.maximum(high, prev_high),
+                        )
                     object_bounds[object_id] = (low, high)
                 object_cells[object_id].append({"level": level, "cell": cell})
 
@@ -400,11 +443,17 @@ def build_collection(
             # quadric-optimal position, which can sit slightly outside the hull of the vertices
             # it replaced. Taking the union over what was actually written is the only bound
             # that cannot be narrower than the geometry.
-            collection_low = low if collection_low is None else np.minimum(collection_low, low)
-            collection_high = high if collection_high is None else np.maximum(collection_high, high)
+            collection_low = (
+                low if collection_low is None else np.minimum(collection_low, low)
+            )
+            collection_high = (
+                high if collection_high is None else np.maximum(collection_high, high)
+            )
 
             _, extent = cell_box(cell, level, grid.cell_size)
-            lod_error = float(extent.max() / QUANT_MAX + displacement.get((level, cell), 0.0))
+            lod_error = float(
+                extent.max() / QUANT_MAX + displacement.get((level, cell), 0.0)
+            )
 
             # A parent's error must dominate its children's, and this is what makes a descent
             # well-founded: a planner keeps a cell when its error fits the budget and descends
@@ -429,7 +478,9 @@ def build_collection(
                         codec=codec,
                         compression=compression,
                     ),
-                    "indices": encode_indices(faces, codec=codec, compression=compression),
+                    "indices": encode_indices(
+                        faces, codec=codec, compression=compression
+                    ),
                     "vertex_count": len(vertices),
                     "index_count": len(faces) * 3,
                     "object_ids": ids,
@@ -464,7 +515,14 @@ def build_collection(
         shards.append((level, build_table(rows, schemas["geometry"])))
 
     _warn_if_decimation_missed(
-        cell_rows, levels, locked, pinnable, grid.cell_size, at_the_floor, schedule, backend
+        cell_rows,
+        levels,
+        locked,
+        pinnable,
+        grid.cell_size,
+        at_the_floor,
+        schedule,
+        backend,
     )
 
     object_rows = []
@@ -489,7 +547,9 @@ def build_collection(
 
     manifest = Manifest(
         grid=grid,
-        encoding=Encoding(codec=codec, compression=compression, decimation=schedule.declaration),
+        encoding=Encoding(
+            codec=codec, compression=compression, decimation=schedule.declaration
+        ),
         shape=_shape_of(collection_low, collection_high),
         axes=tuple(axes),  # type: ignore[arg-type]
         counts={
@@ -561,7 +621,8 @@ def _warn_if_decimation_missed(
     is pinned by ``boundary: LOCKED`` and the decimator may not spend it.
     """
     faces_at = {
-        level: sum(row["index_count"] for row in cell_rows if row["level"] == level) // 3
+        level: sum(row["index_count"] for row in cell_rows if row["level"] == level)
+        // 3
         for level in range(levels)
     }
 
@@ -570,7 +631,9 @@ def _warn_if_decimation_missed(
     # resort in `_decimate_to_the_tightest_target_that_survives`, where a surface this decimator
     # cannot coarsen at any target is kept whole -- rare, and stated rather than hidden, because
     # nothing downstream would report it.
-    inverted = [level for level in range(1, levels) if faces_at[level] > faces_at[level - 1]]
+    inverted = [
+        level for level in range(1, levels) if faces_at[level] > faces_at[level - 1]
+    ]
     if inverted:
         worst_inversion = ", ".join(
             f"level {level} holds {faces_at[level]} faces against level {level - 1}'s {faces_at[level - 1]}"
@@ -587,13 +650,15 @@ def _warn_if_decimation_missed(
     missed = [
         (level, faces_at[level] / faces_at[level - 1])
         for level in range(1, levels)
-        if faces_at[level - 1] and faces_at[level] / faces_at[level - 1] > 2 * schedule.ratio
+        if faces_at[level - 1]
+        and faces_at[level] / faces_at[level - 1] > 2 * schedule.ratio
     ]
     if not missed:
         return
 
     worst = ", ".join(
-        f"level {level} kept {ratio:.0%} of level {level - 1}" for level, ratio in missed
+        f"level {level} kept {ratio:.0%} of level {level - 1}"
+        for level, ratio in missed
     )
 
     # Two quite different causes look identical in the ratio, so the message names whichever
@@ -635,7 +700,9 @@ def _warn_if_decimation_missed(
     )
 
 
-def _children_of(cell: int, level: int, per_level: Mapping[int, Mapping[int, Any]]) -> list[int]:
+def _children_of(
+    cell: int, level: int, per_level: Mapping[int, Mapping[int, Any]]
+) -> list[int]:
     """The cells at level ``L-1`` that hold geometry inside this cell."""
     if level == 0:
         return []
@@ -650,7 +717,9 @@ def _children_of(cell: int, level: int, per_level: Mapping[int, Mapping[int, Any
     return found
 
 
-def _child_mask(cell: int, level: int, per_level: Mapping[int, Mapping[int, Any]]) -> int:
+def _child_mask(
+    cell: int, level: int, per_level: Mapping[int, Mapping[int, Any]]
+) -> int:
     """Which of the eight children at level ``L-1`` hold geometry. Zero at the finest level.
 
     Bit ``dx | dy<<1 | dz<<2`` is set when the child at triple ``(2i+dx, 2j+dy, 2k+dz)`` holds

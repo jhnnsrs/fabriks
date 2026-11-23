@@ -146,13 +146,22 @@ _ENCODING_VOCABULARY: dict[str, frozenset[str]] = {
     "codec": frozenset({CODEC_NONE, CODEC_MESHOPT}),
     "compression": frozenset({COMPRESSION_NONE, COMPRESSION_ZSTD}),
     "boundary": frozenset({BOUNDARY_LOCKED, BOUNDARY_OPEN}),
-    "decimation": frozenset({DECIMATION_QUARTER, DECIMATION_HALF, DECIMATION_EIGHTH, DECIMATION_CUSTOM}),
+    "decimation": frozenset(
+        {DECIMATION_QUARTER, DECIMATION_HALF, DECIMATION_EIGHTH, DECIMATION_CUSTOM}
+    ),
 }
 
 #: The keys a reader cannot work without, and which are therefore never defaulted. ``codec``
 #: and ``compression`` are the load-bearing pair: guessing them does not produce an error, it
 #: produces geometry that decodes to garbage.
-_REQUIRED_ENCODING_KEYS = ("positions", "indices", "codec", "compression", "boundary", "decimation")
+_REQUIRED_ENCODING_KEYS = (
+    "positions",
+    "indices",
+    "codec",
+    "compression",
+    "boundary",
+    "decimation",
+)
 
 
 @dataclass(frozen=True)
@@ -224,14 +233,18 @@ class Grid:
 
     def __post_init__(self) -> None:
         """Refuse a grid that cannot address geometry."""
-        if len(self.cell_size) != 3 or any(int(component) < 1 for component in self.cell_size):
+        if len(self.cell_size) != 3 or any(
+            int(component) < 1 for component in self.cell_size
+        ):
             raise FormatError(
                 f"`cell_size` is three whole numbers of at least 1 voxel, one per component in the same order as the vertices, got {self.cell_size!r}."
             )
         if self.levels < 1:
             raise FormatError(f"An octree has at least one level, got {self.levels}.")
         if self.sort_key != SORT_KEY_MORTON:
-            raise FormatError(f"`sort_key` is {self.sort_key!r}; the format defines {SORT_KEY_MORTON}.")
+            raise FormatError(
+                f"`sort_key` is {self.sort_key!r}; the format defines {SORT_KEY_MORTON}."
+            )
 
     def to_dict(self) -> dict[str, Any]:
         """The manifest's ``grid`` object."""
@@ -247,9 +260,13 @@ class Grid:
         try:
             cell_size = tuple(int(component) for component in raw["cellSize"])
         except (KeyError, TypeError, ValueError) as error:
-            raise FormatError(f"A manifest's `grid` needs a three-component `cellSize`, got {raw!r}.") from error
+            raise FormatError(
+                f"A manifest's `grid` needs a three-component `cellSize`, got {raw!r}."
+            ) from error
         if len(cell_size) != 3:
-            raise FormatError(f"A mesh grid is three-dimensional, so `cellSize` takes 3 values, got {raw['cellSize']!r}.")
+            raise FormatError(
+                f"A mesh grid is three-dimensional, so `cellSize` takes 3 values, got {raw['cellSize']!r}."
+            )
         return cls(
             cell_size=cell_size,  # type: ignore[arg-type]
             levels=int(raw.get("levels", 0)),
@@ -258,7 +275,7 @@ class Grid:
 
     def cell_extent(self, level: int) -> tuple[float, float, float]:
         """How many voxels a cell spans per axis at ``level``."""
-        scale = 2**int(level)
+        scale = 2 ** int(level)
         return tuple(float(component) * scale for component in self.cell_size)  # type: ignore[return-value]
 
 
@@ -303,7 +320,9 @@ class Decimation:
                 f"got {self.ratio}."
             )
         if self.floor_faces < 4:
-            raise FormatError(f"`floor_faces` is at least one tetrahedron's worth, 4, got {self.floor_faces}.")
+            raise FormatError(
+                f"`floor_faces` is at least one tetrahedron's worth, 4, got {self.floor_faces}."
+            )
         if self.declaration not in _ENCODING_VOCABULARY["decimation"]:
             raise FormatError(
                 f"`declaration` is {self.declaration!r}; the format defines "
@@ -411,14 +430,24 @@ def _read_shape(raw: Any) -> tuple[int, int, int] | None:  # noqa: ANN401
     """
     if raw is None:
         return None
-    if isinstance(raw, (str, bytes, Mapping)) or not isinstance(raw, Sequence) or len(raw) != _SHAPE_RANK:
-        raise FormatError(f"A mesh collection is three-dimensional, so `shape` is {_SHAPE_RANK} sizes, got {raw!r}.")
+    if (
+        isinstance(raw, (str, bytes, Mapping))
+        or not isinstance(raw, Sequence)
+        or len(raw) != _SHAPE_RANK
+    ):
+        raise FormatError(
+            f"A mesh collection is three-dimensional, so `shape` is {_SHAPE_RANK} sizes, got {raw!r}."
+        )
     try:
         sizes = tuple(int(size) for size in raw)
     except (TypeError, ValueError) as error:
-        raise FormatError(f"`shape` is three whole numbers of voxels, got {raw!r}.") from error
+        raise FormatError(
+            f"`shape` is three whole numbers of voxels, got {raw!r}."
+        ) from error
     if any(size < 0 for size in sizes):
-        raise FormatError(f"`shape` is a size, so no component is negative, got {raw!r}.")
+        raise FormatError(
+            f"`shape` is a size, so no component is negative, got {raw!r}."
+        )
     return sizes  # type: ignore[return-value]
 
 
@@ -431,8 +460,14 @@ def read_axes(raw: Any) -> tuple[str, str, str] | None:  # noqa: ANN401
     """
     if raw is None:
         return None
-    if isinstance(raw, (str, bytes, Mapping)) or not isinstance(raw, Sequence) or len(raw) != _SHAPE_RANK:
-        raise FormatError(f"A mesh collection is three-dimensional, so `axes` names {_SHAPE_RANK} axes, got {raw!r}.")
+    if (
+        isinstance(raw, (str, bytes, Mapping))
+        or not isinstance(raw, Sequence)
+        or len(raw) != _SHAPE_RANK
+    ):
+        raise FormatError(
+            f"A mesh collection is three-dimensional, so `axes` names {_SHAPE_RANK} axes, got {raw!r}."
+        )
     names = tuple(str(name) for name in raw)
     if len(set(names)) != len(names):
         raise FormatError(f"`axes` names each axis once, got {list(names)!r}.")
@@ -513,7 +548,11 @@ class Manifest:
     def catalog_file(self, role: str, fallback: str) -> FileEntry:
         """Where the manifest says a catalog is, or where the format puts it."""
         declared = (self.files or {}).get(role)
-        return FileEntry(path=fallback) if declared is None else FileEntry.from_any(declared)
+        return (
+            FileEntry(path=fallback)
+            if declared is None
+            else FileEntry.from_any(declared)
+        )
 
     def level_files(self, level: int) -> list[FileEntry] | None:
         """The parts holding one level, or ``None`` if the manifest does not say.

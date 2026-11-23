@@ -39,7 +39,9 @@ def objects() -> dict[int, Any]:
             [260.0, 210.0, 95.0]
         ),
         # Comfortably inside one cell, and small.
-        3: trimesh.creation.box(extents=[40.0, 24.0, 16.0]).apply_translation([90.0, 70.0, 40.0]),
+        3: trimesh.creation.box(extents=[40.0, 24.0, 16.0]).apply_translation(
+            [90.0, 70.0, 40.0]
+        ),
         # A sphere, for geometry that is not axis-aligned.
         11: trimesh.creation.icosphere(radius=26.0, subdivisions=2).apply_translation(
             [420.0, 300.0, 150.0]
@@ -51,8 +53,12 @@ def objects() -> dict[int, Any]:
 def collection(objects: dict[int, Any]) -> fabriks.MeshCollection:
     """A built collection, shared across the suite because building it is the slow part."""
     with warnings.catch_warnings():
-        warnings.simplefilter("ignore")  # the QUARTER warning is asserted on where it matters
-        return fabriks.build_collection(objects, cell_size=CELL_SIZE, levels=LEVELS, axes=("x", "y", "z"))
+        warnings.simplefilter(
+            "ignore"
+        )  # the QUARTER warning is asserted on where it matters
+        return fabriks.build_collection(
+            objects, cell_size=CELL_SIZE, levels=LEVELS, axes=("x", "y", "z")
+        )
 
 
 @pytest.fixture(scope="session")
@@ -101,7 +107,9 @@ class AccountingStore(fabriks.MemoryStore):
         """Read a window, counting the window rather than the object behind it."""
         self._depth += 1
         try:
-            return self._record(path, super().get_range(path, start=start, length=length))
+            return self._record(
+                path, super().get_range(path, start=start, length=length)
+            )
         finally:
             self._depth -= 1
 

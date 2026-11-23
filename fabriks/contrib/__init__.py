@@ -70,7 +70,14 @@ import time. Reach for it by name -- ``from fabriks.contrib import read_glb``.
 from fabriks.contrib.catalog import fit_of, names_of
 from fabriks.contrib.fit import DEFAULT_RESOLUTION, VoxelFit
 from fabriks.contrib.gltf import read_glb, read_gltf, write_glb, write_gltf
-from fabriks.contrib.meshes import read_off, read_ply, read_stl, write_off, write_ply, write_stl
+from fabriks.contrib.meshes import (
+    read_off,
+    read_ply,
+    read_stl,
+    write_off,
+    write_ply,
+    write_stl,
+)
 from fabriks.contrib.obj import read_obj, write_obj
 from fabriks.contrib.scene import Imported, ReadOptions, Source, WriteOptions
 

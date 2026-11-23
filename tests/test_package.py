@@ -34,7 +34,9 @@ def test_everything_promised_is_actually_there():
     """A name in ``__all__`` that does not resolve is a documented symbol that is not real."""
     missing = [name for name in fabriks.__all__ if not hasattr(fabriks, name)]
 
-    assert not missing, f"`__all__` promises {missing}, which `import fabriks` does not provide"
+    assert not missing, (
+        f"`__all__` promises {missing}, which `import fabriks` does not provide"
+    )
 
 
 def test_nothing_public_is_left_out_of_the_promise():
@@ -44,7 +46,11 @@ def test_nothing_public_is_left_out_of_the_promise():
     -- so callers find it, depend on it, and break when it moves. Either it belongs in
     ``__all__`` or it belongs behind an underscore.
     """
-    public = {name for name in dir(fabriks) if not name.startswith("_") and name not in _SUBMODULES}
+    public = {
+        name
+        for name in dir(fabriks)
+        if not name.startswith("_") and name not in _SUBMODULES
+    }
 
     assert not public - set(fabriks.__all__), (
         f"these are importable from `fabriks` but not in `__all__`: {sorted(public - set(fabriks.__all__))}"
@@ -58,6 +64,8 @@ def test_the_promise_lists_each_name_once():
     sorts the isort way (constants, then classes, then functions) rather than the way
     ``sorted()`` does. Asserting a second, different order here would just make the two fight.
     """
-    duplicated = sorted({name for name in fabriks.__all__ if fabriks.__all__.count(name) > 1})
+    duplicated = sorted(
+        {name for name in fabriks.__all__ if fabriks.__all__.count(name) > 1}
+    )
 
     assert not duplicated, f"`__all__` lists {duplicated} more than once"

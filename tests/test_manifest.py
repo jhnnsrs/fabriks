@@ -29,7 +29,10 @@ def a_manifest(**overrides: object) -> dict:
             "decimation": "QUARTER",
         },
         "counts": {"objects": 3, "cellsPerLevel": [34, 8, 1]},
-        "files": {"cells": "catalog/cells.parquet", "objects": "catalog/objects.parquet"},
+        "files": {
+            "cells": "catalog/cells.parquet",
+            "objects": "catalog/objects.parquet",
+        },
     }
     base.update(overrides)
     return base
@@ -58,8 +61,16 @@ def test_every_name_the_format_fixes_survives_being_signed():
     disagree about, since older ones emit ``%7E`` where the spec says leave it bare. Nothing here
     contains one, so the tighter set costs nothing and refuses one that appears later.
     """
-    paths = [fabriks.MANIFEST_NAME, fabriks.CELL_CATALOG_PATH, fabriks.OBJECT_CATALOG_PATH]
-    paths += [level_part_path(level, part) for level in (0, 1, 9, 10) for part in (0, 7, 99999)]
+    paths = [
+        fabriks.MANIFEST_NAME,
+        fabriks.CELL_CATALOG_PATH,
+        fabriks.OBJECT_CATALOG_PATH,
+    ]
+    paths += [
+        level_part_path(level, part)
+        for level in (0, 1, 9, 10)
+        for part in (0, 7, 99999)
+    ]
 
     for path in paths:
         for segment in path.split("/"):
@@ -84,7 +95,9 @@ def test_the_stored_encoding_is_resolved_rather_than_sparse():
     Defaulting a key inside the writer without persisting it would hand every reader an
     encoding that says nothing -- which is the one implementation trap in this design.
     """
-    written = json.loads(Manifest(grid=Grid((128, 128, 64), 3), encoding=Encoding()).to_json())
+    written = json.loads(
+        Manifest(grid=Grid((128, 128, 64), 3), encoding=Encoding()).to_json()
+    )
 
     assert set(written["encoding"]) == {
         "positions",
@@ -111,7 +124,9 @@ def test_a_manifest_without_a_grid_or_an_encoding_is_refused():
     for dropped in ("grid", "encoding"):
         raw = a_manifest()
         del raw[dropped]
-        with pytest.raises(fabriks.FormatError, match="must carry a `grid` and an `encoding`"):
+        with pytest.raises(
+            fabriks.FormatError, match="must carry a `grid` and an `encoding`"
+        ):
             Manifest.from_dict(raw)
 
 
@@ -155,7 +170,9 @@ def test_the_cell_size_is_read_in_x_y_z_and_not_reversed():
 
     Asymmetric on purpose: a cubic fixture passes a reversed implementation.
     """
-    grid = Grid.from_dict({"cellSize": [128, 128, 64], "levels": 3, "sortKey": "MORTON"})
+    grid = Grid.from_dict(
+        {"cellSize": [128, 128, 64], "levels": 3, "sortKey": "MORTON"}
+    )
 
     assert grid.cell_size == (128, 128, 64)
     assert grid.cell_extent(0) == (128.0, 128.0, 64.0)
@@ -168,13 +185,23 @@ def test_a_manifest_key_this_reader_does_not_know_is_ignored_rather_than_refused
     The unknown key opens the manifest unchanged and is simply not carried into what this
     reader writes back; the keys the format does know, such as ``axes``, are.
     """
-    manifest = Manifest.from_dict(a_manifest(axes=["z", "y", "x"], somethingElse={"any": "shape"}))
+    manifest = Manifest.from_dict(
+        a_manifest(axes=["z", "y", "x"], somethingElse={"any": "shape"})
+    )
 
     assert manifest.grid.cell_size == (128, 128, 64)
     assert manifest.axes == ("z", "y", "x")
     written = manifest.to_dict()
     assert "somethingElse" not in written
-    assert set(written) == {"specVersion", "grid", "encoding", "counts", "files", "shape", "axes"}
+    assert set(written) == {
+        "specVersion",
+        "grid",
+        "encoding",
+        "counts",
+        "files",
+        "shape",
+        "axes",
+    }
 
 
 def test_shape_and_axes_are_carried_but_may_be_unknown():
@@ -187,7 +214,15 @@ def test_shape_and_axes_are_carried_but_may_be_unknown():
     """
     bare = Manifest(grid=Grid((128, 128, 64), 3), encoding=Encoding()).to_dict()
 
-    assert set(bare) == {"specVersion", "grid", "encoding", "counts", "files", "shape", "axes"}
+    assert set(bare) == {
+        "specVersion",
+        "grid",
+        "encoding",
+        "counts",
+        "files",
+        "shape",
+        "axes",
+    }
     assert bare["shape"] is None
     assert bare["axes"] is None
 

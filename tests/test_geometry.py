@@ -27,7 +27,11 @@ def round_trip_at(point: np.ndarray, level: int) -> np.ndarray:
     triple = np.floor(point / extent).astype(np.int64)
     cell = morton_encode_one(tuple(int(component) for component in triple))
     blob = fabriks.encode_positions(
-        point.reshape(1, 3), cell=cell, level=level, cell_size=CELL_SIZE, codec=fabriks.CODEC_NONE
+        point.reshape(1, 3),
+        cell=cell,
+        level=level,
+        cell_size=CELL_SIZE,
+        codec=fabriks.CODEC_NONE,
     )
     return fabriks.decode_positions(
         blob, cell=cell, level=level, cell_size=CELL_SIZE, codec=fabriks.CODEC_NONE
@@ -41,13 +45,17 @@ def test_a_plane_shared_by_every_level_decodes_identically_at_every_level():
     which is exactly the case where a disagreement would be a visible crack between a fine cell
     and the coarse neighbour it abuts.
     """
-    point = np.array([512.0, 512.0, 256.0])  # 128*4, 128*4, 64*4: a face plane at levels 0..2
+    point = np.array(
+        [512.0, 512.0, 256.0]
+    )  # 128*4, 128*4, 64*4: a face plane at levels 0..2
     snapped, boundary = snap_boundary(point.reshape(1, 3), CELL_SIZE, COARSE_EXTENT)
     assert boundary[0], "a point on a cell face plane is a boundary vertex"
 
     decoded = [round_trip_at(snapped[0], level) for level in range(LEVELS)]
     for level, position in enumerate(decoded):
-        assert position == pytest.approx(point, abs=0.0), f"level {level} moved a locked vertex"
+        assert position == pytest.approx(point, abs=0.0), (
+            f"level {level} moved a locked vertex"
+        )
 
 
 def test_a_tangential_coordinate_is_snapped_onto_the_coarsest_lattice():
@@ -94,13 +102,17 @@ def test_the_on_plane_window_is_a_full_coarse_quantum_wide():
     snapped, boundary = snap_boundary(just_inside, CELL_SIZE, COARSE_EXTENT)
 
     assert boundary[0], "a vertex within a coarse quantum of a plane counts as on it"
-    assert snapped[0, 0] == 512.0, "and is pinned to the plane rather than snapped across it"
+    assert snapped[0, 0] == 512.0, (
+        "and is pinned to the plane rather than snapped across it"
+    )
 
 
 def test_decimation_never_moves_a_fixed_vertex():
     """``LOCKED`` is boundary immobility, and this is that property directly."""
     rng = np.random.default_rng(7)
-    grid = np.stack(np.meshgrid(np.arange(9.0), np.arange(9.0), [0.0]), axis=-1).reshape(-1, 3)
+    grid = np.stack(
+        np.meshgrid(np.arange(9.0), np.arange(9.0), [0.0]), axis=-1
+    ).reshape(-1, 3)
     vertices = grid + rng.random(grid.shape) * 0.01
     faces = []
     for i in range(8):
@@ -125,7 +137,10 @@ def test_decimation_reaches_its_target_when_nothing_is_pinned():
     faces = np.asarray(sphere.faces, dtype=np.int64)
 
     _, kept, moved = decimate_fixed(
-        vertices, faces, fixed=np.zeros(len(vertices), dtype=bool), target_faces=len(faces) // 4
+        vertices,
+        faces,
+        fixed=np.zeros(len(vertices), dtype=bool),
+        target_faces=len(faces) // 4,
     )
 
     assert len(kept) <= len(faces) // 4
@@ -138,12 +153,18 @@ def test_a_small_object_is_not_decimated_out_of_existence():
     The failure this guards is silent in the worst way: a level that lost a row looks exactly
     like a level that never had one, so the object simply disappears when a viewer zooms out.
     """
-    tiny = trimesh.creation.box(extents=[6.0, 4.0, 3.0]).apply_translation([40.0, 40.0, 20.0])
+    tiny = trimesh.creation.box(extents=[6.0, 4.0, 3.0]).apply_translation(
+        [40.0, 40.0, 20.0]
+    )
 
-    collection = fabriks.build_collection({5: tiny}, cell_size=(128, 128, 64), levels=3, axes=("x", "y", "z"))
+    collection = fabriks.build_collection(
+        {5: tiny}, cell_size=(128, 128, 64), levels=3, axes=("x", "y", "z")
+    )
 
     for level, shard in collection.shards:
-        assert shard.num_rows > 0, f"level {level} lost the only object in the collection"
+        assert shard.num_rows > 0, (
+            f"level {level} lost the only object in the collection"
+        )
         assert 5 in shard.column("object_ids")[0].as_py()
 
 
@@ -153,7 +174,10 @@ def test_on_planes_finds_the_faces_of_the_level_it_is_asked_about():
 
     assert on_planes(vertices, np.array([128.0, 128.0, 64.0])).tolist() == [True, False]
     # At level 1 the cell is 256 wide, so x=128 is interior -- free for the decimator to spend.
-    assert on_planes(vertices, np.array([256.0, 256.0, 128.0])).tolist() == [False, False]
+    assert on_planes(vertices, np.array([256.0, 256.0, 128.0])).tolist() == [
+        False,
+        False,
+    ]
 
 
 def _clip_one_cell_at_a_time(subject: trimesh.Trimesh, cell_size: np.ndarray) -> dict:
@@ -186,22 +210,34 @@ def _clip_one_cell_at_a_time(subject: trimesh.Trimesh, cell_size: np.ndarray) ->
 @pytest.mark.parametrize(
     "body",
     [
-        trimesh.creation.icosphere(radius=40.0, subdivisions=3).apply_translation([70.0, 50.0, 45.0]),
+        trimesh.creation.icosphere(radius=40.0, subdivisions=3).apply_translation(
+            [70.0, 50.0, 45.0]
+        ),
         # Faces lying exactly in cell planes: the case where which cells get a face is subtle.
-        trimesh.creation.box(extents=[64.0, 64.0, 32.0]).apply_translation([64.0, 64.0, 48.0]),
-        trimesh.creation.capsule(radius=6.0, height=150.0).apply_transform(
-            trimesh.transformations.rotation_matrix(0.9, [1.0, 1.0, 0.0])
-        ).apply_translation([90.0, 90.0, 90.0]),
+        trimesh.creation.box(extents=[64.0, 64.0, 32.0]).apply_translation(
+            [64.0, 64.0, 48.0]
+        ),
+        trimesh.creation.capsule(radius=6.0, height=150.0)
+        .apply_transform(trimesh.transformations.rotation_matrix(0.9, [1.0, 1.0, 0.0]))
+        .apply_translation([90.0, 90.0, 90.0]),
     ],
 )
-def test_bisection_clipping_cuts_the_same_cells_as_cutting_each_cell_out(body: trimesh.Trimesh):
+def test_bisection_clipping_cuts_the_same_cells_as_cutting_each_cell_out(
+    body: trimesh.Trimesh,
+):
     """The bisection is a speed change only: same cells, same surface in each."""
     cell_size = np.array([32, 32, 32], dtype=np.int64)
     expected = _clip_one_cell_at_a_time(body, cell_size)
     actual = clip_to_cells(coerce_mesh(body), cell_size)
 
-    assert list(actual) == sorted(expected), "a different set of cells, or out of (i, j, k) order"
+    assert list(actual) == sorted(expected), (
+        "a different set of cells, or out of (i, j, k) order"
+    )
     for key, fragment in expected.items():
-        assert np.isclose(actual[key].area, fragment.area), f"cell {key} holds a different surface"
+        assert np.isclose(actual[key].area, fragment.area), (
+            f"cell {key} holds a different surface"
+        )
         low, high = np.asarray(key) * cell_size, (np.asarray(key) + 1) * cell_size
-        assert (actual[key].vertices >= low - 1e-9).all() and (actual[key].vertices <= high + 1e-9).all()
+        assert (actual[key].vertices >= low - 1e-9).all() and (
+            actual[key].vertices <= high + 1e-9
+        ).all()

@@ -65,7 +65,9 @@ def get_range_bytes(store: FabriksStore, path: str, start: int, length: int) -> 
     where a cell's row group is at all.
     """
     if start < 0 or length < 0:
-        raise FormatError(f"A byte window starts at or after 0 and has a length of at least 0, got {start}:{length}.")
+        raise FormatError(
+            f"A byte window starts at or after 0 and has a length of at least 0, got {start}:{length}."
+        )
     validate_relative(path)
     ranged: Any = getattr(store, "get_range", None)
     if callable(ranged):
@@ -86,7 +88,9 @@ async def aget_bytes(store: FabriksStore, path: str) -> bytes:
     return await asyncio.to_thread(get_bytes, store, path)
 
 
-async def aget_range_bytes(store: FabriksStore, path: str, start: int, length: int) -> bytes:
+async def aget_range_bytes(
+    store: FabriksStore, path: str, start: int, length: int
+) -> bytes:
     """Read one window without blocking the event loop.
 
     Uses the store's own async method when it has one, and otherwise runs the sync path in a
@@ -94,7 +98,9 @@ async def aget_range_bytes(store: FabriksStore, path: str, start: int, length: i
     it to a thread genuinely overlaps it with the others in flight.
     """
     if start < 0 or length < 0:
-        raise FormatError(f"A byte window starts at or after 0 and has a length of at least 0, got {start}:{length}.")
+        raise FormatError(
+            f"A byte window starts at or after 0 and has a length of at least 0, got {start}:{length}."
+        )
     path = validate_relative(path)
     native: Any = getattr(store, "get_range_async", None)
     if callable(native):

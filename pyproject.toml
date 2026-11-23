@@ -37,78 +37,11 @@ obstore = ["obstore>=0.10"]
 meshopt = ["meshoptimizer>=0.2.30a0"]
 complete = ["obstore>=0.10", "meshoptimizer>=0.2.30a0"]
 
-[tool.uv]
-dev-dependencies = [
-    "pytest>=8.3.5",
-    "pytest-cov>=6.1.1",
-    "python-semantic-release>=9.21.0",
-    "ruff>0.11",
-    "basedpyright>=1.21",
-    "obstore>=0.10",
-    # pyarrow ships no type information of its own, so these stubs are what holds the frames,
-    # the reader and the writer to the full strict rule set rather than to `Unknown`. They
-    # describe a newer pyarrow than the `>=12` floor above, which is deliberate and safe here:
-    # fabriks only calls `table`/`field`/`schema`, the two Parquet writers, `ParquetFile` and
-    # the buffer types, all of which predate 12 and have not changed shape since.
-    "pyarrow-stubs>=20.0.0.20260625",
-]
-
 [tool.hatch.build.targets.sdist]
 include = ["fabriks"]
 
 [tool.hatch.build.targets.wheel]
 include = ["fabriks"]
-
-[tool.basedpyright]
-include = ["fabriks"]
-exclude = ["**/__pycache__", "tests"]
-typeCheckingMode = "strict"
-# trimesh, fast-simplification and scipy ship no type information, so every value that comes
-# back through them is Unknown no matter what fabriks annotates. These four rules would then
-# report the *dependency's* silence at each of fabriks's call sites, which casts could only
-# paper over -- so they are off, and every other strict rule stays on. pyarrow is typed here
-# through `pyarrow-stubs`, which is why the frames, reader and writer are held to the full set.
-reportUnknownMemberType = false
-reportUnknownArgumentType = false
-reportUnknownVariableType = false
-reportUnknownParameterType = false
-reportMissingTypeStubs = false
-
-[tool.ruff.lint]
-extend-select = ["ANN", "D1", "UP"]
-extend-ignore = ["UP037", "UP038", "UP042"]
-
-[tool.ruff.lint.per-file-ignores]
-# A test's name and docstring say what it asserts; a `-> None` on every one of them is noise
-# that makes the suite harder to read, which is the opposite of what the rule is for.
-"tests/*" = ["ANN001", "ANN201", "ANN202", "ANN206"]
-
-[tool.ruff]
-exclude = [
-    ".bzr",
-    ".direnv",
-    ".eggs",
-    ".git",
-    ".hg",
-    ".mypy_cache",
-    ".nox",
-    ".pants.d",
-    ".pytype",
-    ".ruff_cache",
-    ".svn",
-    ".tox",
-    ".venv",
-    "__pypackages__",
-    "_build",
-    "buck-out",
-    "build",
-    "dist",
-    "node_modules",
-    "venv",
-]
-
-# Same as Black.
-line-length = 100
 
 [tool.pytest.ini_options]
 markers = [
@@ -177,3 +110,14 @@ build-backend = "hatchling.build"
 [tool.hatch.version]
 source = "vcs"
 fallback-version = "0.0.0"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.5",
+    "pytest-cov>=6.1.1",
+    "python-semantic-release>=9.21.0",
+    "ruff==0.17.6",
+    "basedpyright==1.40.2",
+    "obstore>=0.10",
+    "pyarrow-stubs>=20.0.0.20260625",
+]

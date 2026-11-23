@@ -43,13 +43,19 @@ def morton_encode(triples: npt.ArrayLike) -> npt.NDArray[np.int64]:
     if triples.ndim != 2 or triples.shape[1] != 3:
         raise ValueError(f"Cell indices come as an (n, 3) array, got {triples.shape}.")
     if triples.min(initial=0) < 0:
-        raise ValueError("Cell indices are non-negative; shift the geometry into the positive octant first.")
+        raise ValueError(
+            "Cell indices are non-negative; shift the geometry into the positive octant first."
+        )
     if triples.max(initial=0) >= (1 << MORTON_BITS):
         raise ValueError(
             f"A cell index reached {int(triples.max())}, past the {MORTON_BITS}-bit limit that keeps "
             f"a Morton code under 2**53. Use a larger cell_size or fewer levels."
         )
-    codes = _spread_bits(triples[:, 0]) | (_spread_bits(triples[:, 1]) << 1) | (_spread_bits(triples[:, 2]) << 2)
+    codes = (
+        _spread_bits(triples[:, 0])
+        | (_spread_bits(triples[:, 1]) << 1)
+        | (_spread_bits(triples[:, 2]) << 2)
+    )
     if codes.size and int(codes.max()) >= MAX_MORTON:
         raise ValueError("A Morton code exceeded the format's 2**53 limit.")
     return codes

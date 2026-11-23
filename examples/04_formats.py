@@ -106,13 +106,22 @@ def main() -> None:
     # ------ 2. reading it ------ #
     rule("2. Reading it")
     store = fabriks.DirectoryStore(OUTPUT / "store")
-    imported = read_glb(blob, store, COLLECTION, cell_size=CELL_SIZE, levels=LEVELS, axes=("x", "y", "z"))
-    print(f"fit       scale x{imported.fit.scale:.1f}, then shift {np.round(imported.fit.translation, 1).tolist()}")
+    imported = read_glb(
+        blob,
+        store,
+        COLLECTION,
+        cell_size=CELL_SIZE,
+        levels=LEVELS,
+        axes=("x", "y", "z"),
+    )
+    print(
+        f"fit       scale x{imported.fit.scale:.1f}, then shift {np.round(imported.fit.translation, 1).tolist()}"
+    )
     print(f"names     {imported.names}")
     print(
         f"\n`read_glb` scaled the model so its longest side spans {fabriks.contrib.DEFAULT_RESOLUTION}"
-        f" voxels and shifted it\nclear of the origin. `\"7\"` kept its number as its object id;"
-        f" `\"head\"` was given the\nlowest free one and its name went into the object catalog."
+        f' voxels and shifted it\nclear of the origin. `"7"` kept its number as its object id;'
+        f' `"head"` was given the\nlowest free one and its name went into the object catalog.'
     )
 
     # ------ 3. what the fit bought ------ #
@@ -121,7 +130,14 @@ def main() -> None:
 
     # No fit at all: the model is where the file put it, which is across the origin.
     try:
-        read_glb(blob, fabriks.MemoryStore(), "raw", fit=VoxelFit.identity(), levels=1, axes=("x", "y", "z"))
+        read_glb(
+            blob,
+            fabriks.MemoryStore(),
+            "raw",
+            fit=VoxelFit.identity(),
+            levels=1,
+            axes=("x", "y", "z"),
+        )
     except ValueError as error:
         print(f"no fit at all      -> refused: {error}")
 
@@ -140,7 +156,9 @@ def main() -> None:
         )
     shifted = fabriks.open_collection(shifted_store, "shifted")
 
-    print(f"\n{'':12s}{'cell_size':>18s}{'levels':>8s}{'cells at L0':>14s}{'quantum':>12s}")
+    print(
+        f"\n{'':12s}{'cell_size':>18s}{'levels':>8s}{'cells at L0':>14s}{'quantum':>12s}"
+    )
     for label, collection in (("shifted", shifted), ("fitted", fitted)):
         print(
             f"{label:12s}{collection.grid.cell_size!s:>18s}{collection.grid.levels:>8d}"
@@ -179,7 +197,9 @@ def main() -> None:
             warnings.simplefilter("ignore")
             out = write_glb(fitted, OUTPUT / f"level-{level}.glb", level=level)
         back = trimesh.load(io.BytesIO(out), file_type="glb")
-        drift = float(np.max(np.abs(np.asarray(back.bounds) - np.asarray(scene.bounds))))
+        drift = float(
+            np.max(np.abs(np.asarray(back.bounds) - np.asarray(scene.bounds)))
+        )
         print(f"{level:>6d}{'GLB':>8s}{len(out):>12,d}{drift:>20.2e}")
 
     obj = write_obj(fitted, OUTPUT / "level-0.obj", level=0)

@@ -38,7 +38,9 @@ def test_obstore_satisfies_the_protocol_with_no_adapter():
     )
 
 
-@pytest.mark.parametrize("kind", ["memory", "directory", "obstore-local", "obstore-memory"])
+@pytest.mark.parametrize(
+    "kind", ["memory", "directory", "obstore-local", "obstore-memory"]
+)
 def test_the_same_tree_lands_in_every_kind_of_store(
     collection: fabriks.MeshCollection, tmp_path: Path, kind: str
 ):

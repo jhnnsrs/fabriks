@@ -34,7 +34,11 @@ NAME_COLUMN = "name"
 #: The uniform scale an import applied, repeated on every row.
 FIT_SCALE_COLUMN = "fit_scale"
 #: The translation an import applied, one column per component, repeated on every row.
-FIT_TRANSLATION_COLUMNS = ("fit_translation_x", "fit_translation_y", "fit_translation_z")
+FIT_TRANSLATION_COLUMNS = (
+    "fit_translation_x",
+    "fit_translation_y",
+    "fit_translation_z",
+)
 
 
 def _table(collection: Any) -> pa.Table:  # noqa: ANN401 - a built or an opened collection
@@ -127,7 +131,9 @@ def fit_of(collection: Any) -> VoxelFit | None:  # noqa: ANN401 - an opened coll
     """
     table = _table(collection)
     wanted = (FIT_SCALE_COLUMN, *FIT_TRANSLATION_COLUMNS)
-    if table.num_rows == 0 or any(column not in table.column_names for column in wanted):
+    if table.num_rows == 0 or any(
+        column not in table.column_names for column in wanted
+    ):
         return None
 
     numbers: list[float] = []

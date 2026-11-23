@@ -54,7 +54,9 @@ def test_everything_the_manifest_names_exists_before_the_manifest_does(
 
     files = json.loads(store.objects["c/fabriks.json"])["files"]
     named = [files["cells"]["path"], files["objects"]["path"]]
-    named += [entry["path"] for entries in files["levels"].values() for entry in entries]
+    named += [
+        entry["path"] for entries in files["levels"].values() for entry in entries
+    ]
 
     written_before_manifest = set(store.order[:-1])
     for path in named:
@@ -63,7 +65,9 @@ def test_everything_the_manifest_names_exists_before_the_manifest_does(
         )
 
 
-def test_an_interrupted_write_leaves_a_prefix_that_is_refused(collection: fabriks.MeshCollection):
+def test_an_interrupted_write_leaves_a_prefix_that_is_refused(
+    collection: fabriks.MeshCollection,
+):
     """Precisely the shape a killed writer leaves, and it must not read as a collection."""
     store = fabriks.MemoryStore()
     fabriks.write_collection(collection, store, "c")
@@ -112,7 +116,9 @@ def test_a_large_level_is_split_across_parts_and_still_reads_as_one(
     )
 
 
-def test_the_levels_written_are_contiguous_from_zero(collection: fabriks.MeshCollection):
+def test_the_levels_written_are_contiguous_from_zero(
+    collection: fabriks.MeshCollection,
+):
     """A gap is geometry a planner never asks for.
 
     A planner descends from the coarsest level it can see, so anything under a missing level is
@@ -159,10 +165,16 @@ def test_the_declared_index_width_is_the_one_the_blobs_use():
     A collection whose declaration and blobs disagreed would decode to garbage with nothing
     raised anywhere.
     """
-    objects = {1: trimesh.creation.icosphere(radius=20.0).apply_translation([64.0, 64.0, 32.0])}
+    objects = {
+        1: trimesh.creation.icosphere(radius=20.0).apply_translation([64.0, 64.0, 32.0])
+    }
 
     raw = fabriks.build_collection(
-        objects, cell_size=(128, 128, 64), levels=1, codec=fabriks.CODEC_NONE, axes=("x", "y", "z")
+        objects,
+        cell_size=(128, 128, 64),
+        levels=1,
+        codec=fabriks.CODEC_NONE,
+        axes=("x", "y", "z"),
     )
 
     assert raw.encoding.indices == fabriks.INDICES_UINT32
@@ -187,7 +199,9 @@ def test_write_meshes_builds_and_writes_in_one_call(objects: dict, tmp_path: Pat
     """The convenience form, and the one most callers will use."""
     store = DirectoryStore(tmp_path)
 
-    manifest = fabriks.write_meshes(objects, store, "c", cell_size=CELL_SIZE, levels=2, axes=("x", "y", "z"))
+    manifest = fabriks.write_meshes(
+        objects, store, "c", cell_size=CELL_SIZE, levels=2, axes=("x", "y", "z")
+    )
 
     assert manifest.spec_version == fabriks.SPEC_VERSION
     assert manifest.grid.levels == 2
@@ -203,10 +217,14 @@ def test_the_async_writer_produces_the_same_tree(collection: fabriks.MeshCollect
     asyncio.run(fabriks.awrite_collection(collection, asynchronous, "c"))
 
     assert synchronous.objects.keys() == asynchronous.objects.keys()
-    assert synchronous.objects["c/fabriks.json"] == asynchronous.objects["c/fabriks.json"]
+    assert (
+        synchronous.objects["c/fabriks.json"] == asynchronous.objects["c/fabriks.json"]
+    )
 
 
-def test_writing_twice_replaces_rather_than_accumulates(collection: fabriks.MeshCollection):
+def test_writing_twice_replaces_rather_than_accumulates(
+    collection: fabriks.MeshCollection,
+):
     """A collection is immutable per version, but a retried write must not leave debris."""
     store = fabriks.MemoryStore()
 
@@ -217,7 +235,9 @@ def test_writing_twice_replaces_rather_than_accumulates(collection: fabriks.Mesh
     assert store.objects.keys() == first.keys()
 
 
-def test_the_parquet_codec_is_the_callers_and_reaches_every_file(collection: fabriks.MeshCollection):
+def test_the_parquet_codec_is_the_callers_and_reaches_every_file(
+    collection: fabriks.MeshCollection,
+):
     """A reader that lacks a decoder would draw nothing, so the codec is stated, not inherited."""
     import io
 

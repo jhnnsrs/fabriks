@@ -76,7 +76,9 @@ class VoxelFit:
 
         scale = float(resolution) / longest
         shift = -origin * scale
-        return cls(scale=scale, translation=(float(shift[0]), float(shift[1]), float(shift[2])))
+        return cls(
+            scale=scale, translation=(float(shift[0]), float(shift[1]), float(shift[2]))
+        )
 
     @property
     def is_identity(self) -> bool:
@@ -91,10 +93,13 @@ class VoxelFit:
 
     def invert(self, vertices: npt.ArrayLike) -> npt.NDArray[np.float64]:
         """Take ``(n, 3)`` voxel coordinates back to source coordinates."""
-        if self.scale == 0.0:  # only reachable if a catalog carried one; do not divide by it
+        if (
+            self.scale == 0.0
+        ):  # only reachable if a catalog carried one; do not divide by it
             return np.asarray(vertices, dtype=np.float64)
         return (
-            np.asarray(vertices, dtype=np.float64) - np.asarray(self.translation, dtype=np.float64)
+            np.asarray(vertices, dtype=np.float64)
+            - np.asarray(self.translation, dtype=np.float64)
         ) / self.scale
 
     def to_dict(self) -> dict[str, Any]:
@@ -106,10 +111,15 @@ class VoxelFit:
         """Read back what :meth:`to_dict` wrote, treating nothing at all as the identity."""
         if not raw:
             return cls.identity()
-        shift = tuple(float(component) for component in raw.get("translation", (0.0, 0.0, 0.0)))
+        shift = tuple(
+            float(component) for component in raw.get("translation", (0.0, 0.0, 0.0))
+        )
         if len(shift) != 3:
             return cls.identity()
-        return cls(scale=float(raw.get("scale", 1.0)), translation=(shift[0], shift[1], shift[2]))
+        return cls(
+            scale=float(raw.get("scale", 1.0)),
+            translation=(shift[0], shift[1], shift[2]),
+        )
 
 
 __all__ = ["DEFAULT_RESOLUTION", "VoxelFit"]

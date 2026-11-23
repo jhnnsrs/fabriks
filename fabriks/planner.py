@@ -60,9 +60,14 @@ class Camera:
     ) -> Camera:
         """A camera from a vertical field of view in radians and a viewport height in pixels."""
         if not 0.0 < fov_y < math.pi:
-            raise ValueError(f"`fov_y` is a vertical field of view in radians, got {fov_y}.")
+            raise ValueError(
+                f"`fov_y` is a vertical field of view in radians, got {fov_y}."
+            )
         focal = 0.5 * float(viewport_height) / math.tan(0.5 * float(fov_y))
-        return cls(position=tuple(float(component) for component in position), focal_pixels=focal)  # type: ignore[arg-type]
+        return cls(
+            position=tuple(float(component) for component in position),  # type: ignore[arg-type]
+            focal_pixels=focal,
+        )
 
     def screen_error(self, entry: CellEntry) -> float:
         """How many pixels this cell's LOD error is worth from here.
@@ -81,7 +86,9 @@ class Camera:
         return entry.lod_error * self.focal_pixels / distance
 
 
-def _overlaps(entry: CellEntry, box: tuple[Sequence[float], Sequence[float]] | None) -> bool:
+def _overlaps(
+    entry: CellEntry, box: tuple[Sequence[float], Sequence[float]] | None
+) -> bool:
     """Whether a cell's bounds meet a query box. Touching counts."""
     if box is None:
         return True
@@ -93,7 +100,9 @@ def _overlaps(entry: CellEntry, box: tuple[Sequence[float], Sequence[float]] | N
     )
 
 
-def _inside_frustum(entry: CellEntry, planes: Sequence[tuple[Sequence[float], float]] | None) -> bool:
+def _inside_frustum(
+    entry: CellEntry, planes: Sequence[tuple[Sequence[float], float]] | None
+) -> bool:
     """Whether a cell's box is on the inside of every plane.
 
     Planes are ``(normal, offset)`` with a point ``p`` inside where ``dot(normal, p) + offset
@@ -155,7 +164,11 @@ def plan_cells(
         # The union of the cells the object catalog names for each requested object. A cell
         # holding any one of them is kept -- a cell is the smallest thing a reader fetches, so
         # narrowing further would mean fetching it and discarding part of it anyway.
-        allowed = {key for object_id in objects for key in collection.objects[int(object_id)].cells}
+        allowed = {
+            key
+            for object_id in objects
+            for key in collection.objects[int(object_id)].cells
+        }
 
     def wanted(entry: CellEntry) -> bool:
         if allowed is not None and (entry.level, entry.cell) not in allowed:
@@ -198,7 +211,10 @@ def plan_cells(
             selected[(entry.level, entry.cell)] = entry
             continue
 
-        if max_cells is not None and len(selected) + len(queue) + len(children) > max_cells:
+        if (
+            max_cells is not None
+            and len(selected) + len(queue) + len(children) > max_cells
+        ):
             # Descending would overrun the budget, so keep the coarse cell whole. Degrading
             # detail is the right failure; dropping the cell would punch a hole in the surface.
             selected[(entry.level, entry.cell)] = entry

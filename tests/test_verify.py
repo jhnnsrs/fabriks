@@ -53,7 +53,9 @@ def edit_catalog(store: fabriks.MemoryStore, column: str, values: list[Any]) -> 
     store.objects["c/catalog/cells.parquet"] = table_to_parquet(replaced)
 
 
-def edit_geometry(store: fabriks.MemoryStore, path: str, column: str, values: list[Any]) -> None:
+def edit_geometry(
+    store: fabriks.MemoryStore, path: str, column: str, values: list[Any]
+) -> None:
     """Rewrite one column of a geometry part, keeping the manifest's byte length honest.
 
     Re-serializing changes the file's length, and the manifest records that length so a reader
@@ -81,7 +83,9 @@ def edit_geometry(store: fabriks.MemoryStore, path: str, column: str, values: li
 
 
 @pytest.mark.parametrize("tier", TIERS)
-def test_a_collection_the_writer_wrote_passes_every_tier(sound: fabriks.MemoryStore, tier: str):
+def test_a_collection_the_writer_wrote_passes_every_tier(
+    sound: fabriks.MemoryStore, tier: str
+):
     """The baseline. Without it, every failure below could just be a broken verifier."""
     report = verify(opened(sound), tier=tier)
 
@@ -96,8 +100,12 @@ def test_the_tiers_are_cumulative_and_cost_more_as_they_go(sound: fabriks.Memory
 
     counts = [len(verify(collection, tier=tier).checks) for tier in TIERS]
 
-    assert counts == sorted(counts), f"tiers should only add checks, got {dict(zip(TIERS, counts))}"
-    assert counts[0] < counts[-1], "the deepest tier must actually check more than the cheapest"
+    assert counts == sorted(counts), (
+        f"tiers should only add checks, got {dict(zip(TIERS, counts))}"
+    )
+    assert counts[0] < counts[-1], (
+        "the deepest tier must actually check more than the cheapest"
+    )
 
 
 def test_an_unknown_tier_is_refused(sound: fabriks.MemoryStore):
@@ -118,7 +126,9 @@ def test_a_cleared_child_mask_bit_is_caught(sound: fabriks.MemoryStore):
     table = parquet_to_table(sound.objects["c/catalog/cells.parquet"])
     masks = table.column("child_mask").to_pylist()
     levels = table.column("level").to_pylist()
-    target = next(i for i, (level, mask) in enumerate(zip(levels, masks)) if level > 0 and mask)
+    target = next(
+        i for i, (level, mask) in enumerate(zip(levels, masks)) if level > 0 and mask
+    )
     # Turn off one set bit, which is the quietest possible corruption of the octree.
     masks[target] &= masks[target] - 1
     edit_catalog(sound, "child_mask", masks)
@@ -135,7 +145,9 @@ def test_an_inverted_lod_error_is_caught(sound: fabriks.MemoryStore):
     errors[target] = 0.0
     edit_catalog(sound, "lod_error", errors)
 
-    assert "a parent's error dominates its children's" in failed(sound, tier="structure")
+    assert "a parent's error dominates its children's" in failed(
+        sound, tier="structure"
+    )
 
 
 def test_a_missing_locator_is_caught(sound: fabriks.MemoryStore):
@@ -148,14 +160,18 @@ def test_a_missing_locator_is_caught(sound: fabriks.MemoryStore):
     assert "every cell carries a locator" in failed(sound, tier="structure")
 
 
-def test_a_locator_pointing_at_a_part_that_does_not_exist_is_caught(sound: fabriks.MemoryStore):
+def test_a_locator_pointing_at_a_part_that_does_not_exist_is_caught(
+    sound: fabriks.MemoryStore,
+):
     """Caught from the manifest alone, so registration rejects it rather than the first viewer."""
     table = parquet_to_table(sound.objects["c/catalog/cells.parquet"])
     parts = table.column("part").to_pylist()
     parts[0] = 99
     edit_catalog(sound, "part", parts)
 
-    assert "locators point inside the files that exist" in failed(sound, tier="structure")
+    assert "locators point inside the files that exist" in failed(
+        sound, tier="structure"
+    )
 
 
 def test_a_row_group_past_the_end_of_its_part_is_caught(sound: fabriks.MemoryStore):
@@ -165,10 +181,14 @@ def test_a_row_group_past_the_end_of_its_part_is_caught(sound: fabriks.MemorySto
     groups[0] = 9_999
     edit_catalog(sound, "row_group", groups)
 
-    assert "locators point inside the files that exist" in failed(sound, tier="structure")
+    assert "locators point inside the files that exist" in failed(
+        sound, tier="structure"
+    )
 
 
-def test_an_object_catalog_naming_a_cell_that_does_not_exist_is_caught(sound: fabriks.MemoryStore):
+def test_an_object_catalog_naming_a_cell_that_does_not_exist_is_caught(
+    sound: fabriks.MemoryStore,
+):
     """The identity index is only an index if what it points at is there."""
     table = parquet_to_table(sound.objects["c/catalog/objects.parquet"])
     cells = table.column("cells").to_pylist()
@@ -180,10 +200,14 @@ def test_an_object_catalog_naming_a_cell_that_does_not_exist_is_caught(sound: fa
     )
     sound.objects["c/catalog/objects.parquet"] = table_to_parquet(replaced)
 
-    assert failed(sound, tier="structure") == {"the object catalog names cells that exist"}
+    assert failed(sound, tier="structure") == {
+        "the object catalog names cells that exist"
+    }
 
 
-def test_a_wrong_vertex_count_is_caught_when_the_blob_is_decoded(sound: fabriks.MemoryStore):
+def test_a_wrong_vertex_count_is_caught_when_the_blob_is_decoded(
+    sound: fabriks.MemoryStore,
+):
     """Structure cannot see this and blobs must: the count is a claim about bytes."""
     table = parquet_to_table(sound.objects["c/catalog/cells.parquet"])
     counts = table.column("vertex_count").to_pylist()
@@ -191,7 +215,9 @@ def test_a_wrong_vertex_count_is_caught_when_the_blob_is_decoded(sound: fabriks.
     edit_catalog(sound, "vertex_count", counts)
 
     assert verify(opened(sound), tier="structure").ok, "no structural claim was touched"
-    assert "every blob decodes to the counts its row claims" in failed(sound, tier="blobs")
+    assert "every blob decodes to the counts its row claims" in failed(
+        sound, tier="blobs"
+    )
 
 
 def test_a_truncated_blob_is_caught(sound: fabriks.MemoryStore):
@@ -201,7 +227,9 @@ def test_a_truncated_blob_is_caught(sound: fabriks.MemoryStore):
     positions[0] = positions[0][: len(positions[0]) // 2]
     edit_geometry(sound, "level0/part-00000.parquet", "positions", positions)
 
-    assert "every blob decodes to the counts its row claims" in failed(sound, tier="blobs")
+    assert "every blob decodes to the counts its row claims" in failed(
+        sound, tier="blobs"
+    )
 
 
 def test_a_geometry_row_holding_an_unknown_object_is_caught(sound: fabriks.MemoryStore):
@@ -211,7 +239,9 @@ def test_a_geometry_row_holding_an_unknown_object_is_caught(sound: fabriks.Memor
     ids[0] = [*ids[0][:-1], 4_711]
     edit_geometry(sound, "level0/part-00000.parquet", "object_ids", ids)
 
-    assert "the two catalogs agree about who is in which cell" in failed(sound, tier="blobs")
+    assert "the two catalogs agree about who is in which cell" in failed(
+        sound, tier="blobs"
+    )
 
 
 def test_the_geometry_checks_actually_compared_something(sound: fabriks.MemoryStore):
@@ -228,7 +258,9 @@ def test_the_geometry_checks_actually_compared_something(sound: fabriks.MemorySt
     bounded = detail["lod_error bounds how far a vertex moved from level 0"]
 
     assert not pinned.startswith("0 "), f"the LOCKED check compared nothing: {pinned}"
-    assert not bounded.startswith("0 "), f"the lod_error check compared nothing: {bounded}"
+    assert not bounded.startswith("0 "), (
+        f"the lod_error check compared nothing: {bounded}"
+    )
 
 
 def test_a_coarse_level_larger_than_the_one_below_is_caught(sound: fabriks.MemoryStore):
@@ -236,7 +268,10 @@ def test_a_coarse_level_larger_than_the_one_below_is_caught(sound: fabriks.Memor
     table = parquet_to_table(sound.objects["c/catalog/cells.parquet"])
     levels = table.column("level").to_pylist()
     counts = table.column("index_count").to_pylist()
-    counts = [count * 100 if level == LEVELS - 1 else count for level, count in zip(levels, counts)]
+    counts = [
+        count * 100 if level == LEVELS - 1 else count
+        for level, count in zip(levels, counts)
+    ]
     edit_catalog(sound, "index_count", counts)
 
     assert "a coarse level holds less than the level it summarises" in failed(
@@ -253,10 +288,15 @@ def test_an_lod_error_too_small_to_be_true_is_caught(sound: fabriks.MemoryStore)
     table = parquet_to_table(sound.objects["c/catalog/cells.parquet"])
     levels = table.column("level").to_pylist()
     errors = table.column("lod_error").to_pylist()
-    errors = [1e-9 if 0 < level < LEVELS - 1 else error for level, error in zip(levels, errors)]
+    errors = [
+        1e-9 if 0 < level < LEVELS - 1 else error
+        for level, error in zip(levels, errors)
+    ]
     edit_catalog(sound, "lod_error", errors)
 
-    assert "lod_error bounds how far a vertex moved from level 0" in failed(sound, tier="geometry")
+    assert "lod_error bounds how far a vertex moved from level 0" in failed(
+        sound, tier="geometry"
+    )
 
 
 def test_a_boundary_vertex_that_moved_is_caught(sound: fabriks.MemoryStore):
@@ -319,8 +359,9 @@ def test_a_boundary_vertex_that_moved_is_caught(sound: fabriks.MemoryStore):
     else:
         pytest.fail("the fixture has no pinned vertex at any level to displace")
 
-    assert "on-plane vertices are held fixed across levels (boundary: LOCKED)" in failed(
-        sound, tier="geometry"
+    assert (
+        "on-plane vertices are held fixed across levels (boundary: LOCKED)"
+        in failed(sound, tier="geometry")
     )
 
 
@@ -339,13 +380,20 @@ def test_a_surface_tangent_to_a_cell_plane_is_not_reported_as_drifted():
     positions and none of them touches a plane, so the inflated neighbourhood stays empty.
     """
     tangent = trimesh.creation.icosphere(subdivisions=3, radius=12.0)
-    tangent.apply_translation([60.0, 60.0, 12.0])  # lowest vertex exactly on the z=0 plane
+    tangent.apply_translation(
+        [60.0, 60.0, 12.0]
+    )  # lowest vertex exactly on the z=0 plane
     clear = trimesh.creation.icosphere(subdivisions=3, radius=9.0)
     clear.apply_translation([190.0, 70.0, 30.0])
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        built = fabriks.build_collection({1: tangent, 2: clear}, cell_size=CELL_SIZE, levels=LEVELS, axes=("x", "y", "z"))
+        built = fabriks.build_collection(
+            {1: tangent, 2: clear},
+            cell_size=CELL_SIZE,
+            levels=LEVELS,
+            axes=("x", "y", "z"),
+        )
     store = fabriks.MemoryStore()
     fabriks.write_collection(built, store, "c")
 
@@ -383,14 +431,18 @@ def test_the_report_reads_as_something_a_person_would_read(sound: fabriks.Memory
     assert not report
     assert "FAIL" in str(report)
     assert "files exist" in str(report)
-    assert any(check.examples for check in report.failures), "a failure should name what failed"
+    assert any(check.examples for check in report.failures), (
+        "a failure should name what failed"
+    )
 
 
 def test_a_single_level_collection_verifies(objects: dict[int, Any]):
     """One level means no cross-level claims to check, which must be a pass and not a crash."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        built = fabriks.build_collection(objects, cell_size=CELL_SIZE, levels=1, axes=("x", "y", "z"))
+        built = fabriks.build_collection(
+            objects, cell_size=CELL_SIZE, levels=1, axes=("x", "y", "z")
+        )
     store = fabriks.MemoryStore()
     fabriks.write_collection(built, store, "c")
 
@@ -399,7 +451,9 @@ def test_a_single_level_collection_verifies(objects: dict[int, Any]):
     assert report.ok, str(report)
 
 
-def test_the_manifest_and_the_report_agree_on_which_files_exist(sound: fabriks.MemoryStore):
+def test_the_manifest_and_the_report_agree_on_which_files_exist(
+    sound: fabriks.MemoryStore,
+):
     """``verify_paths`` is what a caller iterates to copy or check a collection by hand."""
     from fabriks.verify import verify_paths
 
@@ -408,4 +462,6 @@ def test_the_manifest_and_the_report_agree_on_which_files_exist(sound: fabriks.M
     assert set(paths) == {
         path.removeprefix("c/") for path in sound.objects if path != "c/fabriks.json"
     }
-    assert json.loads(sound.objects["c/fabriks.json"])["files"]["cells"]["path"] in paths
+    assert (
+        json.loads(sound.objects["c/fabriks.json"])["files"]["cells"]["path"] in paths
+    )

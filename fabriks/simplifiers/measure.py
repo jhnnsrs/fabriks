@@ -13,7 +13,9 @@ import numpy.typing as npt
 from fabriks.geometry import border_vertices
 
 
-def measure_deviation(before: npt.NDArray[np.float64], after: npt.NDArray[np.float64]) -> float:
+def measure_deviation(
+    before: npt.NDArray[np.float64], after: npt.NDArray[np.float64]
+) -> float:
     """How far the simplified surface strays from the one it came from, as an upper bound.
 
     The furthest any original vertex sits from the *nearest surviving vertex*. Points on the
@@ -29,11 +31,17 @@ def measure_deviation(before: npt.NDArray[np.float64], after: npt.NDArray[np.flo
         return 0.0
     from scipy.spatial import cKDTree  # type: ignore[attr-defined]
 
-    return float(cKDTree(np.asarray(after, dtype=np.float64)).query(np.asarray(before, dtype=np.float64))[0].max())
+    return float(
+        cKDTree(np.asarray(after, dtype=np.float64))
+        .query(np.asarray(before, dtype=np.float64))[0]
+        .max()
+    )
 
 
 def boundary_held(
-    vertices: npt.NDArray[np.float64], faces: npt.NDArray[np.int64], kept: npt.NDArray[np.float64]
+    vertices: npt.NDArray[np.float64],
+    faces: npt.NDArray[np.int64],
+    kept: npt.NDArray[np.float64],
 ) -> bool:
     """Whether every vertex on the open boundary survived at exactly its old position.
 
@@ -47,12 +55,16 @@ def boundary_held(
         return True
     from scipy.spatial import cKDTree  # type: ignore[attr-defined]
 
-    distances = cKDTree(np.asarray(kept, dtype=np.float64)).query(np.asarray(vertices[boundary], dtype=np.float64))[0]
+    distances = cKDTree(np.asarray(kept, dtype=np.float64)).query(
+        np.asarray(vertices[boundary], dtype=np.float64)
+    )[0]
     return bool((distances == 0.0).all())
 
 
 def pinned_held(
-    vertices: npt.NDArray[np.float64], kept: npt.NDArray[np.float64], fixed: npt.NDArray[np.bool_]
+    vertices: npt.NDArray[np.float64],
+    kept: npt.NDArray[np.float64],
+    fixed: npt.NDArray[np.bool_],
 ) -> bool:
     """Whether every vertex the *format* pins survived at exactly its old position.
 
@@ -77,7 +89,9 @@ def pinned_held(
         return True
     from scipy.spatial import cKDTree  # type: ignore[attr-defined]
 
-    distances = cKDTree(np.asarray(kept, dtype=np.float64)).query(np.asarray(vertices[fixed], dtype=np.float64))[0]
+    distances = cKDTree(np.asarray(kept, dtype=np.float64)).query(
+        np.asarray(vertices[fixed], dtype=np.float64)
+    )[0]
     return bool((distances == 0.0).all())
 
 

@@ -97,10 +97,16 @@ def coerce_mesh(source: MeshSource) -> Mesh:
     vertex_array = np.asarray(vertices, dtype=np.float64)
     face_array = np.asarray(faces, dtype=np.int64)
     if vertex_array.ndim != 2 or vertex_array.shape[1] != 3:
-        raise ValueError(f"Vertices come as an (n, 3) array of voxel coordinates, got {vertex_array.shape}.")
+        raise ValueError(
+            f"Vertices come as an (n, 3) array of voxel coordinates, got {vertex_array.shape}."
+        )
     if face_array.ndim != 2 or face_array.shape[1] != 3:
-        raise ValueError(f"Faces come as an (m, 3) array of triangle indices, got {face_array.shape}.")
-    if face_array.size and (face_array.max() >= len(vertex_array) or face_array.min() < 0):
+        raise ValueError(
+            f"Faces come as an (m, 3) array of triangle indices, got {face_array.shape}."
+        )
+    if face_array.size and (
+        face_array.max() >= len(vertex_array) or face_array.min() < 0
+    ):
         raise ValueError(
             f"A face indexes vertex {int(face_array.max())} of {len(vertex_array)}, so these faces do not belong to "
             f"these vertices."

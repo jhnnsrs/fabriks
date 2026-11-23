@@ -53,9 +53,13 @@ class ConcurrentStore(fabriks.MemoryStore):
         """Read a whole object, tracked."""
         return await self._tracked(lambda: self.get(path))
 
-    async def get_range_async(self, path: str, *, start: int, length: int | None = None) -> bytes:
+    async def get_range_async(
+        self, path: str, *, start: int, length: int | None = None
+    ) -> bytes:
         """Read one window, tracked."""
-        return await self._tracked(lambda: self.get_range(path, start=start, length=length))
+        return await self._tracked(
+            lambda: self.get_range(path, start=start, length=length)
+        )
 
     def forget(self) -> None:
         """Reset the record."""
@@ -66,9 +70,9 @@ class ConcurrentStore(fabriks.MemoryStore):
 def many_objects() -> dict[int, Any]:
     """Enough objects, spread far enough apart, to fill several cells and several row groups."""
     return {
-        1000 + index * 7: trimesh.creation.icosphere(radius=30.0, subdivisions=3).apply_translation(
-            [60.0 + index * 70.0, 80.0, 60.0]
-        )
+        1000 + index * 7: trimesh.creation.icosphere(
+            radius=30.0, subdivisions=3
+        ).apply_translation([60.0 + index * 70.0, 80.0, 60.0])
         for index in range(24)
     }
 
@@ -78,7 +82,9 @@ def many(many_objects: dict[int, Any]) -> fabriks.MeshCollection:
     """The larger collection, built once."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        return fabriks.build_collection(many_objects, cell_size=CELL_SIZE, levels=LEVELS, axes=("x", "y", "z"))
+        return fabriks.build_collection(
+            many_objects, cell_size=CELL_SIZE, levels=LEVELS, axes=("x", "y", "z")
+        )
 
 
 @pytest.fixture()
@@ -89,7 +95,9 @@ def served(many: fabriks.MeshCollection) -> ConcurrentStore:
     return store
 
 
-def test_opening_a_collection_without_blocking_reads_the_same_manifest(served: ConcurrentStore):
+def test_opening_a_collection_without_blocking_reads_the_same_manifest(
+    served: ConcurrentStore,
+):
     """``aopen_collection`` differs from ``open_collection`` in when it yields, not in what it reads."""
     synchronous = fabriks.open_collection(served, "c")
 
@@ -100,7 +108,9 @@ def test_opening_a_collection_without_blocking_reads_the_same_manifest(served: C
     assert asynchronous.prefix == synchronous.prefix
 
 
-def test_opening_an_interrupted_write_is_refused_asynchronously_too(served: ConcurrentStore):
+def test_opening_an_interrupted_write_is_refused_asynchronously_too(
+    served: ConcurrentStore,
+):
     """The completion protocol is a property of the tree, not of which reader looked at it."""
     del served.objects["c/fabriks.json"]
 
@@ -108,7 +118,9 @@ def test_opening_an_interrupted_write_is_refused_asynchronously_too(served: Conc
         asyncio.run(fabriks.aopen_collection(served, "c"))
 
 
-def test_the_async_reader_returns_exactly_what_the_sync_one_does(served: ConcurrentStore):
+def test_the_async_reader_returns_exactly_what_the_sync_one_does(
+    served: ConcurrentStore,
+):
     """Two paths to the same bytes; a difference between them is a bug in one of them."""
     reference = fabriks.open_collection(served, "c")
     keys = [(entry.level, entry.cell) for entry in reference.plan(error_budget=0.3)]
@@ -130,7 +142,9 @@ def test_the_reads_actually_overlap(served: ConcurrentStore):
     """The whole point. Sequential awaits would leave the peak at one."""
     collection = fabriks.open_collection(served, "c")
     keys = [(entry.level, entry.cell) for entry in collection.plan(error_budget=0.3)]
-    assert len(keys) > 4, "the fixture must plan enough cells for overlap to be observable"
+    assert len(keys) > 4, (
+        "the fixture must plan enough cells for overlap to be observable"
+    )
 
     served.forget()
     asyncio.run(_read(served, keys))
@@ -166,10 +180,14 @@ def test_a_store_with_no_async_methods_still_reads(many: fabriks.MeshCollection)
         assert np.array_equal(actual.faces, wanted.faces)
 
 
-def test_reading_one_cell_asynchronously_matches_reading_it_synchronously(served: ConcurrentStore):
+def test_reading_one_cell_asynchronously_matches_reading_it_synchronously(
+    served: ConcurrentStore,
+):
     """``aread_cell`` is the single-key convenience and must not diverge from the plural form."""
     collection = fabriks.open_collection(served, "c")
-    entry = min((e for e in collection.cells.values() if e.level == 0), key=lambda e: e.cell)
+    entry = min(
+        (e for e in collection.cells.values() if e.level == 0), key=lambda e: e.cell
+    )
 
     got = asyncio.run(_one(served, entry.level, entry.cell))
     expected = collection.read_cell(entry.level, entry.cell)
@@ -189,7 +207,9 @@ def test_an_unknown_cell_is_refused_before_anything_is_fetched(served: Concurren
 
     with pytest.raises(KeyError, match="holds no cell"):
         asyncio.run(attempt())
-    assert served.calls == 0, "a cell the catalog does not name must cost no fetch at all"
+    assert served.calls == 0, (
+        "a cell the catalog does not name must cost no fetch at all"
+    )
 
 
 def test_two_overlapping_reads_open_each_part_once(served: ConcurrentStore):
@@ -210,11 +230,17 @@ def test_two_overlapping_reads_open_each_part_once(served: ConcurrentStore):
         first, second = await asyncio.gather(
             collection.aread_cells(keys[:half]), collection.aread_cells(keys[half:])
         )
-        return first + second, len(collection._parquet_files), len(collection._part_files)
+        return (
+            first + second,
+            len(collection._parquet_files),
+            len(collection._part_files),
+        )
 
     got, parts, handles = asyncio.run(both())
 
-    assert parts == handles, "a part was opened twice, so its prefetches prime a file nothing reads"
+    assert parts == handles, (
+        "a part was opened twice, so its prefetches prime a file nothing reads"
+    )
     for actual, wanted in zip(got, expected):
         assert np.array_equal(actual.vertices, wanted.vertices)
 
@@ -250,7 +276,9 @@ async def _read(
     return await collection.aread_cells(keys, concurrency=concurrency)
 
 
-async def _one(store: fabriks.FabriksStore, level: int, cell: int) -> fabriks.DecodedCell:
+async def _one(
+    store: fabriks.FabriksStore, level: int, cell: int
+) -> fabriks.DecodedCell:
     """Open and read a single cell."""
     collection = await fabriks.aopen_collection(store, "c")
     return await collection.aread_cell(level, cell)

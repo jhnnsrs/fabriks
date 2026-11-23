@@ -28,21 +28,47 @@ ParquetCompression = Literal["none", "snappy", "gzip", "brotli", "lz4", "zstd"]
 #: writer's half, so a malformed frame fails before it is written to a store.
 REQUIRED_COLUMNS: dict[str, tuple[str, ...]] = {
     "cell_catalog": (
-        "level", "cell", "vertex_count", "index_count",
-        "bbox_min_x", "bbox_min_y", "bbox_min_z",
-        "bbox_max_x", "bbox_max_y", "bbox_max_z",
-        "lod_error", "object_count", "child_mask",
-        "part", "row_group", "blob_bytes",
+        "level",
+        "cell",
+        "vertex_count",
+        "index_count",
+        "bbox_min_x",
+        "bbox_min_y",
+        "bbox_min_z",
+        "bbox_max_x",
+        "bbox_max_y",
+        "bbox_max_z",
+        "lod_error",
+        "object_count",
+        "child_mask",
+        "part",
+        "row_group",
+        "blob_bytes",
     ),
     "object_catalog": (
-        "object_id", "ordinal",
-        "bbox_min_x", "bbox_min_y", "bbox_min_z",
-        "bbox_max_x", "bbox_max_y", "bbox_max_z",
-        "vertex_count", "index_count", "cells",
+        "object_id",
+        "ordinal",
+        "bbox_min_x",
+        "bbox_min_y",
+        "bbox_min_z",
+        "bbox_max_x",
+        "bbox_max_y",
+        "bbox_max_z",
+        "vertex_count",
+        "index_count",
+        "cells",
     ),
     "geometry": (
-        "level", "cell", "positions", "indices", "vertex_count", "index_count",
-        "object_ids", "object_ordinals", "object_vertex_offsets", "object_index_offsets",
+        "level",
+        "cell",
+        "positions",
+        "indices",
+        "vertex_count",
+        "index_count",
+        "object_ids",
+        "object_ordinals",
+        "object_vertex_offsets",
+        "object_index_offsets",
     ),
 }
 
@@ -67,43 +93,59 @@ def arrow_schemas() -> dict[str, pa.Schema]:
         for axis in ("x", "y", "z")
     ]
     return {
-        "cell_catalog": pa.schema([
-            pa.field("level", pa.int32()),
-            pa.field("cell", pa.int64()),
-            pa.field("vertex_count", pa.int32()),
-            pa.field("index_count", pa.int32()),
-            *bbox,
-            pa.field("lod_error", pa.float64()),
-            pa.field("object_count", pa.int32()),
-            pa.field("child_mask", pa.uint8()),
-            # The locator: which part of the level holds this cell, and which row group of it.
-            # Null on a built-but-unwritten collection -- part assignment and row-group
-            # boundaries are only known once the geometry has actually been serialized, so the
-            # writer fills these in and nothing before it can.
-            pa.field("part", pa.int32(), nullable=True),
-            pa.field("row_group", pa.int32(), nullable=True),
-            pa.field("blob_bytes", pa.int64(), nullable=True),
-        ]),
-        "object_catalog": pa.schema([
-            pa.field("object_id", pa.int64()),
-            pa.field("ordinal", pa.int32()),
-            *bbox,
-            pa.field("vertex_count", pa.int32()),
-            pa.field("index_count", pa.int32()),
-            pa.field("cells", pa.list_(pa.struct([pa.field("level", pa.int32()), pa.field("cell", pa.int64())]))),
-        ]),
-        "geometry": pa.schema([
-            pa.field("level", pa.int32()),
-            pa.field("cell", pa.int64()),
-            pa.field("positions", pa.binary()),
-            pa.field("indices", pa.binary()),
-            pa.field("vertex_count", pa.int32()),
-            pa.field("index_count", pa.int32()),
-            pa.field("object_ids", pa.list_(pa.int64())),
-            pa.field("object_ordinals", pa.list_(pa.int32())),
-            pa.field("object_vertex_offsets", pa.list_(pa.int32())),
-            pa.field("object_index_offsets", pa.list_(pa.int32())),
-        ]),
+        "cell_catalog": pa.schema(
+            [
+                pa.field("level", pa.int32()),
+                pa.field("cell", pa.int64()),
+                pa.field("vertex_count", pa.int32()),
+                pa.field("index_count", pa.int32()),
+                *bbox,
+                pa.field("lod_error", pa.float64()),
+                pa.field("object_count", pa.int32()),
+                pa.field("child_mask", pa.uint8()),
+                # The locator: which part of the level holds this cell, and which row group of it.
+                # Null on a built-but-unwritten collection -- part assignment and row-group
+                # boundaries are only known once the geometry has actually been serialized, so the
+                # writer fills these in and nothing before it can.
+                pa.field("part", pa.int32(), nullable=True),
+                pa.field("row_group", pa.int32(), nullable=True),
+                pa.field("blob_bytes", pa.int64(), nullable=True),
+            ]
+        ),
+        "object_catalog": pa.schema(
+            [
+                pa.field("object_id", pa.int64()),
+                pa.field("ordinal", pa.int32()),
+                *bbox,
+                pa.field("vertex_count", pa.int32()),
+                pa.field("index_count", pa.int32()),
+                pa.field(
+                    "cells",
+                    pa.list_(
+                        pa.struct(
+                            [
+                                pa.field("level", pa.int32()),
+                                pa.field("cell", pa.int64()),
+                            ]
+                        )
+                    ),
+                ),
+            ]
+        ),
+        "geometry": pa.schema(
+            [
+                pa.field("level", pa.int32()),
+                pa.field("cell", pa.int64()),
+                pa.field("positions", pa.binary()),
+                pa.field("indices", pa.binary()),
+                pa.field("vertex_count", pa.int32()),
+                pa.field("index_count", pa.int32()),
+                pa.field("object_ids", pa.list_(pa.int64())),
+                pa.field("object_ordinals", pa.list_(pa.int32())),
+                pa.field("object_vertex_offsets", pa.list_(pa.int32())),
+                pa.field("object_index_offsets", pa.list_(pa.int32())),
+            ]
+        ),
     }
 
 
@@ -122,7 +164,9 @@ def validate_columns(table: pa.Table, role: str) -> None:
     try:
         required = REQUIRED_COLUMNS[role]
     except KeyError as error:
-        raise FormatError(f"{role!r} is not a role of a mesh collection; try {', '.join(REQUIRED_COLUMNS)}.") from error
+        raise FormatError(
+            f"{role!r} is not a role of a mesh collection; try {', '.join(REQUIRED_COLUMNS)}."
+        ) from error
 
     names = set(_column_names(table))
     missing = [column for column in required if column not in names]
@@ -149,7 +193,9 @@ def _column_names(table: Any) -> Iterable[str]:  # noqa: ANN401
     raise FormatError(f"fabriks cannot read column names off a {type(table).__name__}.")
 
 
-def table_to_parquet(table: pa.Table, *, compression: ParquetCompression = "zstd") -> bytes:
+def table_to_parquet(
+    table: pa.Table, *, compression: ParquetCompression = "zstd"
+) -> bytes:
     """Serialize an Arrow table to Parquet bytes.
 
     The Parquet-level compression is the *file's*, and is a separate thing from the format's:

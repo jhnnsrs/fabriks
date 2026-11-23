@@ -60,7 +60,9 @@ def demo_objects(count: int = 32) -> dict[int, trimesh.Trimesh]:
         y = 260.0 + 120.0 * math.sin(index * 0.7)
         z = 130.0 + 60.0 * math.cos(index * 0.5)
 
-        instance_id = 1000 + index * 7  # ids as a label image would carry them: sparse, unsorted
+        instance_id = (
+            1000 + index * 7
+        )  # ids as a label image would carry them: sparse, unsorted
         if index % 3 == 0:
             body = trimesh.creation.icosphere(radius=26.0, subdivisions=3)
         elif index % 3 == 1:
@@ -96,12 +98,18 @@ def main() -> None:
     objects = demo_objects()
 
     rule("What goes in")
-    print(f"{len(objects)} objects, keyed by the instance ids a label image would carry")
+    print(
+        f"{len(objects)} objects, keyed by the instance ids a label image would carry"
+    )
     for instance_id, mesh in list(objects.items())[:3]:
         low, high = mesh.bounds
-        print(f"  id {instance_id:5d}: {len(mesh.faces):5d} faces, bounds {np.round(low, 1)} .. {np.round(high, 1)}")
+        print(
+            f"  id {instance_id:5d}: {len(mesh.faces):5d} faces, bounds {np.round(low, 1)} .. {np.round(high, 1)}"
+        )
     print(f"  ... and {len(objects) - 3} more")
-    print(f"\ntotal input geometry: {sum(len(mesh.faces) for mesh in objects.values())} faces")
+    print(
+        f"\ntotal input geometry: {sum(len(mesh.faces) for mesh in objects.values())} faces"
+    )
 
     # ---------------------------------------------------------------- #
     # 1. The one-call form.
@@ -128,7 +136,9 @@ def main() -> None:
 
     print(f"wrote {OUTPUT / COLLECTION}")
     print(f"  spec version : {manifest.spec_version}")
-    print(f"  grid         : cell_size={manifest.grid.cell_size} (x, y, z), levels={manifest.grid.levels}")
+    print(
+        f"  grid         : cell_size={manifest.grid.cell_size} (x, y, z), levels={manifest.grid.levels}"
+    )
     print(f"  encoding     : {manifest.encoding.to_dict()}")
     print(f"  counts       : {manifest.counts}")
 
@@ -147,19 +157,32 @@ def main() -> None:
     # 2. The two-step form: build, inspect, then write.
     # ---------------------------------------------------------------- #
     rule("The same thing in two steps, when you want to look first")
-    collection = fabriks.build_collection(objects, cell_size=CELL_SIZE, levels=LEVELS, axes=("x", "y", "z"))
+    collection = fabriks.build_collection(
+        objects, cell_size=CELL_SIZE, levels=LEVELS, axes=("x", "y", "z")
+    )
 
-    print(f"cell catalog   : {collection.cell_catalog.num_rows} rows -- the spatial index")
-    print(f"                 columns: {', '.join(collection.cell_catalog.column_names[:6])}, ...")
-    print(f"object catalog : {collection.object_catalog.num_rows} rows -- the identity index, inverted")
-    print(f"                 columns: {', '.join(collection.object_catalog.column_names[:4])}, ...")
+    print(
+        f"cell catalog   : {collection.cell_catalog.num_rows} rows -- the spatial index"
+    )
+    print(
+        f"                 columns: {', '.join(collection.cell_catalog.column_names[:6])}, ..."
+    )
+    print(
+        f"object catalog : {collection.object_catalog.num_rows} rows -- the identity index, inverted"
+    )
+    print(
+        f"                 columns: {', '.join(collection.object_catalog.column_names[:4])}, ..."
+    )
     for level, shard in collection.shards:
         faces = sum(shard.column("index_count").to_pylist()) // 3
         blobs = sum(
-            len(shard.column("positions")[row].as_py()) + len(shard.column("indices")[row].as_py())
+            len(shard.column("positions")[row].as_py())
+            + len(shard.column("indices")[row].as_py())
             for row in range(shard.num_rows)
         )
-        print(f"level {level}        : {shard.num_rows:3d} cells, {faces:6d} faces, {megabytes(blobs)} of blobs")
+        print(
+            f"level {level}        : {shard.num_rows:3d} cells, {faces:6d} faces, {megabytes(blobs)} of blobs"
+        )
 
     print(
         "\nLevel 0 carries more faces than went in, which is expected: an object wider than a\n"
@@ -183,16 +206,23 @@ def main() -> None:
     # ---------------------------------------------------------------- #
     rule("What a component means, and why the manifest does not say")
     same_scene_reversed = {
-        instance_id: (mesh.vertices[:, ::-1], mesh.faces) for instance_id, mesh in objects.items()
+        instance_id: (mesh.vertices[:, ::-1], mesh.faces)
+        for instance_id, mesh in objects.items()
     }
     reversed_collection = fabriks.build_collection(
         same_scene_reversed, cell_size=CELL_SIZE[::-1], levels=1, axes=("z", "y", "x")
     )
-    forward = fabriks.build_collection(objects, cell_size=CELL_SIZE, levels=1, axes=("x", "y", "z"))
+    forward = fabriks.build_collection(
+        objects, cell_size=CELL_SIZE, levels=1, axes=("x", "y", "z")
+    )
 
     print(f"manifest keys       : {sorted(manifest.to_dict())}")
-    print(f"the scene as given  : cell_size={CELL_SIZE}, {forward.shards[0][1].num_rows} cells at level 0")
-    print(f"components reversed : cell_size={CELL_SIZE[::-1]}, {reversed_collection.shards[0][1].num_rows} cells")
+    print(
+        f"the scene as given  : cell_size={CELL_SIZE}, {forward.shards[0][1].num_rows} cells at level 0"
+    )
+    print(
+        f"components reversed : cell_size={CELL_SIZE[::-1]}, {reversed_collection.shards[0][1].num_rows} cells"
+    )
     print(
         "\nfabriks addresses components by position and never by name -- not when quantizing, not\n"
         "when addressing a cell, not when planning. Feed it (z, y, x) data with a (z, y, x)\n"
@@ -219,8 +249,10 @@ def main() -> None:
 
     in_memory = fabriks.MemoryStore()
     fabriks.write_collection(collection, in_memory, "in-memory")
-    print(f"\nsame collection, in memory: {len(in_memory.objects)} objects, "
-          f"{megabytes(sum(len(body) for body in in_memory.objects.values()))} total")
+    print(
+        f"\nsame collection, in memory: {len(in_memory.objects)} objects, "
+        f"{megabytes(sum(len(body) for body in in_memory.objects.values()))} total"
+    )
 
 
 if __name__ == "__main__":

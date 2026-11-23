@@ -84,9 +84,7 @@ def _optional_str(column: Sequence[Any], row: int) -> str | None:
     return None if value is None else str(value)
 
 
-def _present(
-    columns: Mapping[str, Sequence[Any]], name: str, row: int
-) -> Any:  # noqa: ANN401 -- one cell of a caller-declared parquet column
+def _present(columns: Mapping[str, Sequence[Any]], name: str, row: int) -> Any:  # noqa: ANN401 -- one cell of a caller-declared parquet column
     """One value out of a column the format declares non-null, or a refusal naming it.
 
     Every catalog column but ``part``/``row_group``/``blob_bytes`` is non-null in the schema a
@@ -201,7 +199,12 @@ class CellEntry:
             if not (self.child_mask >> octant) & 1:
                 continue
             dx, dy, dz = octant & 1, (octant >> 1) & 1, (octant >> 2) & 1
-            found.append((self.level - 1, morton_encode_one((2 * i + dx, 2 * j + dy, 2 * k + dz))))
+            found.append(
+                (
+                    self.level - 1,
+                    morton_encode_one((2 * i + dx, 2 * j + dy, 2 * k + dz)),
+                )
+            )
         return found
 
 
@@ -269,8 +272,12 @@ class DecodedCell:
         vertex_start = self.object_vertex_offsets[position]
         index_start = self.object_index_offsets[position]
         last = position + 1 == len(self.object_ids)
-        vertex_stop = len(self.vertices) if last else self.object_vertex_offsets[position + 1]
-        index_stop = len(self.faces) * 3 if last else self.object_index_offsets[position + 1]
+        vertex_stop = (
+            len(self.vertices) if last else self.object_vertex_offsets[position + 1]
+        )
+        index_stop = (
+            len(self.faces) * 3 if last else self.object_index_offsets[position + 1]
+        )
 
         faces = self.faces[index_start // 3 : index_stop // 3] - vertex_start
         return Mesh(vertices=self.vertices[vertex_start:vertex_stop], faces=faces)
@@ -346,12 +353,21 @@ class Collection:
     @cached_property
     def cell_catalog(self) -> pa.Table:
         """The spatial index, read once."""
-        return parquet_to_table(get_bytes(self.store, join(self.prefix, self._path("cells", CELL_CATALOG_PATH))))
+        return parquet_to_table(
+            get_bytes(
+                self.store, join(self.prefix, self._path("cells", CELL_CATALOG_PATH))
+            )
+        )
 
     @cached_property
     def object_catalog(self) -> pa.Table:
         """The identity index, read once."""
-        return parquet_to_table(get_bytes(self.store, join(self.prefix, self._path("objects", OBJECT_CATALOG_PATH))))
+        return parquet_to_table(
+            get_bytes(
+                self.store,
+                join(self.prefix, self._path("objects", OBJECT_CATALOG_PATH)),
+            )
+        )
 
     def _path(self, role: str, fallback: str) -> str:
         """Where the manifest says a catalog is, or where the format puts it."""
@@ -416,7 +432,8 @@ class Collection:
                 vertex_count=_int(columns, "vertex_count", row),
                 index_count=_int(columns, "index_count", row),
                 cells=tuple(
-                    (int(item["level"]), int(item["cell"])) for item in _present(columns, "cells", row)
+                    (int(item["level"]), int(item["cell"]))
+                    for item in _present(columns, "cells", row)
                 ),
                 name=_optional_str(columns.get("name", []), row),
             )
@@ -434,7 +451,9 @@ class Collection:
         """The cells at the coarsest level -- where a descent starts."""
         return self.cells_at(self.grid.levels - 1)
 
-    def cells_for_object(self, object_id: int, level: int | None = None) -> list[CellEntry]:
+    def cells_for_object(
+        self, object_id: int, level: int | None = None
+    ) -> list[CellEntry]:
         """Which cells hold an object -- the lookup the object catalog exists for."""
         try:
             entry = self.objects[int(object_id)]
@@ -507,9 +526,17 @@ class Collection:
         # levels out the old way. Both spellings declare the same specVersion, so the version
         # number cannot tell a reader which to expect and it has to try the other.
         legacy = f"level={int(level)}"
-        found = [path for path in list_paths(self.store, join(self.prefix, head)) if path.endswith(".parquet")]
+        found = [
+            path
+            for path in list_paths(self.store, join(self.prefix, head))
+            if path.endswith(".parquet")
+        ]
         if not found:
-            found = [path for path in list_paths(self.store, join(self.prefix, legacy)) if path.endswith(".parquet")]
+            found = [
+                path
+                for path in list_paths(self.store, join(self.prefix, legacy))
+                if path.endswith(".parquet")
+            ]
         if not found:
             raise FormatError(
                 f"This collection declares {self.grid.levels} levels but nothing is stored under {head!r}, "
@@ -518,7 +545,11 @@ class Collection:
         # A listing is absolute within the store; make it relative to the collection again.
         head_prefix = join(self.prefix, "")
         return [
-            FileEntry(path=path[len(head_prefix) + 1 :] if head_prefix and path.startswith(head_prefix) else path)
+            FileEntry(
+                path=path[len(head_prefix) + 1 :]
+                if head_prefix and path.startswith(head_prefix)
+                else path
+            )
             for path in found
         ]
 
@@ -537,7 +568,9 @@ class Collection:
             if entry.size is None:
                 # No recorded length means nothing can seek to the footer, so the part is read
                 # whole. Correct, and the reason the writer bothers to record the length.
-                self._parquet_files[key] = pq.ParquetFile(_buffer(get_bytes(self.store, path)))
+                self._parquet_files[key] = pq.ParquetFile(
+                    _buffer(get_bytes(self.store, path))
+                )
             else:
                 handle = StoreFile(self.store, path, entry.size)
                 # A read-only seekable file is all `ParquetFile` uses; the stub asks for `IO`.
@@ -560,7 +593,9 @@ class Collection:
                 parquet_to_table(get_bytes(self.store, join(self.prefix, path)))
                 for path in self.level_paths(level)
             ]
-            self._level_tables[level] = tables[0] if len(tables) == 1 else pa.concat_tables(tables)
+            self._level_tables[level] = (
+                tables[0] if len(tables) == 1 else pa.concat_tables(tables)
+            )
         return self._level_tables[level]
 
     def release(self) -> None:
@@ -634,8 +669,12 @@ class Collection:
             faces=faces,
             object_ids=tuple(int(value) for value in record["object_ids"]),
             object_ordinals=tuple(int(value) for value in record["object_ordinals"]),
-            object_vertex_offsets=tuple(int(value) for value in record["object_vertex_offsets"]),
-            object_index_offsets=tuple(int(value) for value in record["object_index_offsets"]),
+            object_vertex_offsets=tuple(
+                int(value) for value in record["object_vertex_offsets"]
+            ),
+            object_index_offsets=tuple(
+                int(value) for value in record["object_index_offsets"]
+            ),
         )
 
     def read_cells(self, keys: Sequence[tuple[int, int]]) -> Iterator[DecodedCell]:
@@ -650,7 +689,9 @@ class Collection:
 
         groups: dict[tuple[int, int | None, int | None], list[CellEntry]] = {}
         for entry in entries:
-            groups.setdefault((entry.level, entry.part, entry.row_group), []).append(entry)
+            groups.setdefault((entry.level, entry.part, entry.row_group), []).append(
+                entry
+            )
 
         decoded: dict[tuple[int, int], DecodedCell] = {}
         for members in groups.values():
@@ -667,7 +708,9 @@ class Collection:
         cell it names, never a scan.
         """
         pieces = []
-        for entry in sorted(self.cells_for_object(object_id, level=level), key=lambda item: item.cell):
+        for entry in sorted(
+            self.cells_for_object(object_id, level=level), key=lambda item: item.cell
+        ):
             piece = self.read_cell(entry.level, entry.cell).object_mesh(object_id)
             if len(piece.faces):
                 pieces.append((piece.vertices, piece.faces))
@@ -676,7 +719,9 @@ class Collection:
         vertices, faces = concatenate_and_weld(pieces)
         return Mesh(vertices=vertices, faces=faces)
 
-    def cell_box(self, level: int, cell: int) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+    def cell_box(
+        self, level: int, cell: int
+    ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
         """The grid box a cell addresses: its origin and its extent, in voxels."""
         return cell_box(int(cell), int(level), self.grid.cell_size)
 
@@ -702,7 +747,9 @@ class Collection:
         entries = [self._entry(level, cell) for level, cell in keys]
         groups: dict[tuple[int, int | None, int | None], list[CellEntry]] = {}
         for entry in entries:
-            groups.setdefault((entry.level, entry.part, entry.row_group), []).append(entry)
+            groups.setdefault((entry.level, entry.part, entry.row_group), []).append(
+                entry
+            )
 
         gate = asyncio.Semaphore(max(1, int(concurrency)))
 
@@ -718,8 +765,15 @@ class Collection:
             if part is not None and group is not None
         ]
         parts = {(level, part) for level, part, _ in located}
-        await asyncio.gather(*(guarded(self._aopen_part(level, part)) for level, part in parts))
-        await asyncio.gather(*(guarded(self._aprefetch(level, part, group)) for level, part, group in located))
+        await asyncio.gather(
+            *(guarded(self._aopen_part(level, part)) for level, part in parts)
+        )
+        await asyncio.gather(
+            *(
+                guarded(self._aprefetch(level, part, group))
+                for level, part, group in located
+            )
+        )
 
         # The row groups are parsed here, on the loop's own thread, and only then is the decode
         # handed out. **That split is not a preference.** A `ParquetFile` and the `StoreFile`
@@ -729,7 +783,9 @@ class Collection:
         # store at all -- while decoding is the meshopt and numpy work that a thread is for.
         tables = [self._table_for(members[0]) for members in groups.values()]
 
-        def decode_group(members: list[CellEntry], table: pa.Table) -> list[DecodedCell]:
+        def decode_group(
+            members: list[CellEntry], table: pa.Table
+        ) -> list[DecodedCell]:
             return [self._decode(entry, table) for entry in members]
 
         results = await asyncio.gather(
@@ -770,7 +826,9 @@ class Collection:
             entry = self._part_entry(level, part)
             path = join(self.prefix, entry.path)
             if entry.size is None:
-                self._parquet_files[key] = pq.ParquetFile(_buffer(await aget_bytes(self.store, path)))
+                self._parquet_files[key] = pq.ParquetFile(
+                    _buffer(await aget_bytes(self.store, path))
+                )
                 return
             handle = StoreFile(self.store, path, entry.size)
             start, length = handle.tail_window()
@@ -781,9 +839,13 @@ class Collection:
     async def _aprefetch(self, level: int, part: int, row_group: int) -> None:
         """Fetch one row group's byte span and hand it to the file the parse will read."""
         handle = self._part_files.get((int(level), int(part)))
-        if handle is None:  # the part was opened from a whole-object read; nothing to prefetch
+        if (
+            handle is None
+        ):  # the part was opened from a whole-object read; nothing to prefetch
             return
-        span = _row_group_span(self._parquet_files[(int(level), int(part))].metadata, int(row_group))
+        span = _row_group_span(
+            self._parquet_files[(int(level), int(part))].metadata, int(row_group)
+        )
         if span is None:
             return
         start, length = span
@@ -791,7 +853,9 @@ class Collection:
             # Already covered -- usually because the part is smaller than the footer window and
             # was pulled whole when it was opened. Re-fetching it here would undo that.
             return
-        handle.prime(start, await aget_range_bytes(self.store, handle.path, start, length))
+        handle.prime(
+            start, await aget_range_bytes(self.store, handle.path, start, length)
+        )
 
     # -- planning ---------------------------------------------------------- #
 

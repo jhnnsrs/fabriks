@@ -56,7 +56,9 @@ def codec_for(codec: str) -> BlobCodec:
     try:
         return _CODECS[codec]
     except KeyError:
-        raise FormatError(f"`codec` is {codec!r}; the format defines {CODEC_NONE} and {CODEC_MESHOPT}.") from None
+        raise FormatError(
+            f"`codec` is {codec!r}; the format defines {CODEC_NONE} and {CODEC_MESHOPT}."
+        ) from None
 
 
 def encode_positions(
@@ -83,8 +85,14 @@ def encode_positions(
     # A boundary vertex is pinned to exactly 0.0 or 1.0, so the slack only has to absorb
     # floating-point noise -- a fraction of a quantum, not a quantum.
     tolerance = 0.5 / QUANT_MAX
-    if normalized.size and (normalized.min() < -tolerance or normalized.max() > 1.0 + tolerance):
-        stray = int(((normalized < -tolerance) | (normalized > 1.0 + tolerance)).any(axis=1).sum())
+    if normalized.size and (
+        normalized.min() < -tolerance or normalized.max() > 1.0 + tolerance
+    ):
+        stray = int(
+            ((normalized < -tolerance) | (normalized > 1.0 + tolerance))
+            .any(axis=1)
+            .sum()
+        )
         raise PartitioningError(
             f"{stray} vertex/vertices fall outside cell {cell} at level {level}, whose box is "
             f"{origin.tolist()} + {extent.tolist()} voxels (worst normalized coordinate "
@@ -122,7 +130,9 @@ def decode_positions(
             "uncompressed length is known, since the format's ZSTD framing carries no size of its own."
         )
     origin, extent = cell_box(cell, level, cell_size)
-    quantized = implementation.decode_positions(blob, compression=compression, vertex_count=vertex_count)
+    quantized = implementation.decode_positions(
+        blob, compression=compression, vertex_count=vertex_count
+    )
     return origin + np.asarray(quantized, dtype=np.float64) / QUANT_MAX * extent
 
 
@@ -141,7 +151,9 @@ def encode_indices(
     """
     implementation = codec_for(codec)
     faces = np.asarray(faces, dtype="<u4").reshape(-1, 3)
-    return implementation.encode_indices(faces, compression=compression, vertex_count=vertex_count)
+    return implementation.encode_indices(
+        faces, compression=compression, vertex_count=vertex_count
+    )
 
 
 def decode_indices(
@@ -164,7 +176,9 @@ def decode_indices(
             "`index_count` is required to decode a compressed indices blob: it is how the "
             "uncompressed length is known, since the format's ZSTD framing carries no size of its own."
         )
-    return implementation.decode_indices(blob, compression=compression, index_count=index_count)
+    return implementation.decode_indices(
+        blob, compression=compression, index_count=index_count
+    )
 
 
 __all__ = [

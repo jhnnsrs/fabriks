@@ -32,7 +32,9 @@ class BlobCodec(Protocol):
     #: The ``encoding.codec`` value that selects this implementation.
     name: str
 
-    def encode_positions(self, quantized: npt.NDArray[np.uint16], *, compression: str) -> bytes:
+    def encode_positions(
+        self, quantized: npt.NDArray[np.uint16], *, compression: str
+    ) -> bytes:
         """Pack an ``(n, 3)`` array of ``uint16`` quantized coordinates into a blob."""
         ...
 
@@ -47,7 +49,13 @@ class BlobCodec(Protocol):
         """
         ...
 
-    def encode_indices(self, faces: npt.NDArray[np.uint32], *, compression: str, vertex_count: int | None) -> bytes:
+    def encode_indices(
+        self,
+        faces: npt.NDArray[np.uint32],
+        *,
+        compression: str,
+        vertex_count: int | None,
+    ) -> bytes:
         """Pack an ``(m, 3)`` triangle array into a blob, preserving triangle order.
 
         Order is not cosmetic: ``object_index_offsets`` names ranges into the concatenated

@@ -43,14 +43,20 @@ LEVELS = 3
 #: The formats that keep one object one object, and the pair of functions that do it.
 NAMED = {"obj": (read_obj, write_obj), "glb": (read_glb, write_glb)}
 #: The formats that hold a surface but not who it belongs to.
-MERGING = {"ply": (read_ply, write_ply), "stl": (read_stl, write_stl), "off": (read_off, write_off)}
+MERGING = {
+    "ply": (read_ply, write_ply),
+    "stl": (read_stl, write_stl),
+    "off": (read_off, write_off),
+}
 
 
 @pytest.fixture()
 def source():
     """A two-object scene: one name that is already an id, one that is not."""
     scene = trimesh.Scene()
-    scene.add_geometry(trimesh.creation.icosphere(radius=0.6, subdivisions=3), geom_name="head")
+    scene.add_geometry(
+        trimesh.creation.icosphere(radius=0.6, subdivisions=3), geom_name="head"
+    )
     scene.add_geometry(
         trimesh.creation.box(extents=[1.0, 0.4, 0.3]),
         geom_name="7",
@@ -63,7 +69,14 @@ def source():
 def written(source):
     """The scene read in through GLB, as an opened collection."""
     store = fabriks.MemoryStore()
-    read_glb(source.export(file_type="glb"), store, "c", cell_size=CELL_SIZE, levels=LEVELS, axes=("x", "y", "z"))
+    read_glb(
+        source.export(file_type="glb"),
+        store,
+        "c",
+        cell_size=CELL_SIZE,
+        levels=LEVELS,
+        axes=("x", "y", "z"),
+    )
     return fabriks.open_collection(store, "c")
 
 
@@ -121,7 +134,9 @@ def test_an_object_comes_back_where_it_started(file_type, source, written):
 
     baked = baked_geometries(source)
     for name, geometry in exported.geometry.items():
-        drift = np.max(np.abs(np.asarray(geometry.bounds) - np.asarray(baked[name].bounds)))
+        drift = np.max(
+            np.abs(np.asarray(geometry.bounds) - np.asarray(baked[name].bounds))
+        )
         assert drift <= tolerance, (
             f"{file_type.upper()} object {name!r} came back {drift} from where it started, which "
             f"is more than the {tolerance} three quantization steps allow"
@@ -138,7 +153,14 @@ def test_a_collection_survives_being_written_out_and_read_back(file_type, writte
     read, write = NAMED[file_type]
     store = fabriks.MemoryStore()
 
-    read(write(written), store, "again", cell_size=CELL_SIZE, levels=LEVELS, axes=("x", "y", "z"))
+    read(
+        write(written),
+        store,
+        "again",
+        cell_size=CELL_SIZE,
+        levels=LEVELS,
+        axes=("x", "y", "z"),
+    )
     again = fabriks.open_collection(store, "again")
 
     assert sorted(again.objects) == sorted(written.objects), (
@@ -157,7 +179,14 @@ def test_a_format_without_names_comes_back_as_one_object(file_type, written):
     read, write = MERGING[file_type]
     store = fabriks.MemoryStore()
 
-    read(write(written), store, "merged", cell_size=CELL_SIZE, levels=LEVELS, axes=("x", "y", "z"))
+    read(
+        write(written),
+        store,
+        "merged",
+        cell_size=CELL_SIZE,
+        levels=LEVELS,
+        axes=("x", "y", "z"),
+    )
     merged = fabriks.open_collection(store, "merged")
 
     assert len(merged.objects) == 1, (
@@ -175,7 +204,9 @@ def test_a_merged_format_still_holds_the_whole_model(file_type, source, written)
     exported = reload(write(written), file_type)
 
     drift = np.max(np.abs(np.asarray(exported.bounds) - np.asarray(source.bounds)))
-    assert drift <= tolerance, f"{file_type.upper()} lost part of the model: bounds moved {drift}"
+    assert drift <= tolerance, (
+        f"{file_type.upper()} lost part of the model: bounds moved {drift}"
+    )
 
 
 def test_a_gltf_goes_out_and_comes_back_through_its_own_mapping(written):
@@ -187,10 +218,14 @@ def test_a_gltf_goes_out_and_comes_back_through_its_own_mapping(written):
     store = fabriks.MemoryStore()
     blob = write_gltf(written)
 
-    assert any(name.endswith(".gltf") for name in blob), f"no document in {sorted(blob)}"
+    assert any(name.endswith(".gltf") for name in blob), (
+        f"no document in {sorted(blob)}"
+    )
     assert any(name.endswith(".bin") for name in blob), f"no buffers in {sorted(blob)}"
 
-    read_gltf(blob, store, "c", cell_size=CELL_SIZE, levels=LEVELS, axes=("x", "y", "z"))
+    read_gltf(
+        blob, store, "c", cell_size=CELL_SIZE, levels=LEVELS, axes=("x", "y", "z")
+    )
     again = fabriks.open_collection(store, "c")
 
     assert {entry.name for entry in again.objects.values()} == {"7", "head"}
@@ -214,9 +249,18 @@ def test_a_gltf_read_from_a_path_finds_its_own_buffers(written, tmp_path):
     write_gltf(written, tmp_path / "model.gltf")
     store = fabriks.MemoryStore()
 
-    read_gltf(tmp_path / "model.gltf", store, "c", cell_size=CELL_SIZE, levels=LEVELS, axes=("x", "y", "z"))
+    read_gltf(
+        tmp_path / "model.gltf",
+        store,
+        "c",
+        cell_size=CELL_SIZE,
+        levels=LEVELS,
+        axes=("x", "y", "z"),
+    )
 
-    assert {entry.name for entry in fabriks.open_collection(store, "c").objects.values()} == {
+    assert {
+        entry.name for entry in fabriks.open_collection(store, "c").objects.values()
+    } == {
         "7",
         "head",
     }

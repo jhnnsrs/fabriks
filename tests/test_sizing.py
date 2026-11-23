@@ -26,11 +26,15 @@ def plan_quietly(objects: dict[int, Any], **kwargs: Any) -> fabriks.GridPlan:  #
         return fabriks.plan_grid(objects, **kwargs)
 
 
-def build_quietly(objects: dict[int, Any], plan: fabriks.GridPlan) -> fabriks.MeshCollection:
+def build_quietly(
+    objects: dict[int, Any], plan: fabriks.GridPlan
+) -> fabriks.MeshCollection:
     """The collection a plan describes. The QUARTER warning is asserted on elsewhere."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        return fabriks.build_collection(objects, axes=("x", "y", "z"), **plan.as_kwargs())
+        return fabriks.build_collection(
+            objects, axes=("x", "y", "z"), **plan.as_kwargs()
+        )
 
 
 @pytest.fixture(scope="module")
@@ -44,7 +48,9 @@ def surface() -> dict[int, Any]:
     narrow, and the estimate tests below run against both on purpose.
     """
     return {
-        1: trimesh.creation.icosphere(radius=400.0, subdivisions=4).apply_translation([420.0] * 3)
+        1: trimesh.creation.icosphere(radius=400.0, subdivisions=4).apply_translation(
+            [420.0] * 3
+        )
     }
 
 
@@ -82,7 +88,9 @@ def test_a_plan_is_built_from_without_being_touched_up(objects):
     plan = plan_quietly(objects)
     collection = build_quietly(objects, plan)
 
-    assert collection.grid.cell_size == plan.cell_size, "the built grid is not the planned one"
+    assert collection.grid.cell_size == plan.cell_size, (
+        "the built grid is not the planned one"
+    )
     assert collection.grid.levels == plan.levels
     assert len(collection.shards) == plan.levels, "every level from 0 gets a shard"
 
@@ -96,7 +104,9 @@ def test_the_cell_is_a_power_of_two_on_every_component(objects):
     for budget in (2 * 1024, 8 * 1024, 64 * 1024):
         plan = plan_quietly(objects, cell_bytes=budget)
         for component in plan.cell_size:
-            assert component & (component - 1) == 0, f"{plan.cell_size} is not a power of two"
+            assert component & (component - 1) == 0, (
+                f"{plan.cell_size} is not a power of two"
+            )
 
 
 def test_a_bigger_cell_budget_never_asks_for_a_smaller_cell(objects):
@@ -106,7 +116,8 @@ def test_a_bigger_cell_budget_never_asks_for_a_smaller_cell(objects):
     fail this: it could jump down a rung as the budget rises past a midpoint.
     """
     sizes = [
-        np.prod(plan_quietly(objects, cell_bytes=b).cell_size) for b in (1024, 4096, 16384, 65536)
+        np.prod(plan_quietly(objects, cell_bytes=b).cell_size)
+        for b in (1024, 4096, 16384, 65536)
     ]
     assert sizes == sorted(sizes), f"cell volume is not monotone in cell_bytes: {sizes}"
 
@@ -119,7 +130,8 @@ def test_a_bigger_layer_budget_never_asks_for_more_levels(objects):
     other way round.
     """
     depths = [
-        plan_quietly(objects, layer_bytes=b).levels for b in (8 * 1024, 64 * 1024, 1024 * 1024)
+        plan_quietly(objects, layer_bytes=b).levels
+        for b in (8 * 1024, 64 * 1024, 1024 * 1024)
     ]
     assert depths == sorted(depths, reverse=True), (
         f"levels is not monotone in layer_bytes: {depths}"
@@ -158,8 +170,12 @@ def test_a_cell_below_the_object_fit_is_warned_about_and_still_returned(objects)
     fit = fabriks.choose_cell_size(
         {key: fabriks.coerce_mesh(value) for key, value in objects.items()}
     )
-    assert plan.object_fit == fit, "the plan reports a different fit than choose_cell_size"
-    assert any(a < b for a, b in zip(plan.cell_size, fit)), "nothing was actually below the fit"
+    assert plan.object_fit == fit, (
+        "the plan reports a different fit than choose_cell_size"
+    )
+    assert any(a < b for a, b in zip(plan.cell_size, fit)), (
+        "nothing was actually below the fit"
+    )
     assert plan.levels >= 1
 
 
@@ -177,7 +193,9 @@ def test_a_cell_index_never_passes_the_morton_limit(objects):
 
     plan = plan_quietly(far, cell_bytes=1024)
     reach = [int(np.ceil(4.01e6 / component)) for component in plan.cell_size]
-    assert max(reach) < (1 << 16), f"cell {plan.cell_size} leaves indices up to {max(reach)}"
+    assert max(reach) < (1 << 16), (
+        f"cell {plan.cell_size} leaves indices up to {max(reach)}"
+    )
     fabriks.morton_encode_one((reach[0], 1, 1))  # raises if the cap is breached
 
 
@@ -204,7 +222,9 @@ def test_an_empty_collection_is_refused_the_way_a_build_refuses_one(objects):
         fabriks.plan_grid({})
 
 
-def test_a_plan_deep_on_cells_under_the_object_fit_warns_that_the_build_may_raise(scattered):
+def test_a_plan_deep_on_cells_under_the_object_fit_warns_that_the_build_may_raise(
+    scattered,
+):
     """The one regime where a plan's own output is known to break `build_collection`.
 
     Decimation places a collapsed vertex at the quadric-optimal position, and for a vertex near
@@ -225,7 +245,9 @@ def test_a_plan_deep_on_cells_under_the_object_fit_warns_that_the_build_may_rais
 @pytest.mark.parametrize(
     ("cell_bytes", "layer_bytes"), [(16 * 1024, 128 * 1024), (32 * 1024, 512 * 1024)]
 )
-def test_a_plan_that_does_not_warn_builds_without_raising(scattered, cell_bytes, layer_bytes):
+def test_a_plan_that_does_not_warn_builds_without_raising(
+    scattered, cell_bytes, layer_bytes
+):
     """The warning above has to be the *only* way into the failure, or it is not worth having.
 
     This is the scene that first exposed the writer bug, so it is the one that has to demonstrate
@@ -234,10 +256,14 @@ def test_a_plan_that_does_not_warn_builds_without_raising(scattered, cell_bytes,
     """
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        plan = fabriks.plan_grid(scattered, cell_bytes=cell_bytes, layer_bytes=layer_bytes)
+        plan = fabriks.plan_grid(
+            scattered, cell_bytes=cell_bytes, layer_bytes=layer_bytes
+        )
 
     assert not any("PartitioningError" in str(entry.message) for entry in caught)
-    build_quietly(scattered, plan)  # raises PartitioningError if the regime was misjudged
+    build_quietly(
+        scattered, plan
+    )  # raises PartitioningError if the regime was misjudged
 
 
 def test_geometry_in_the_negative_octant_is_refused_rather_than_planned_around(objects):
@@ -322,7 +348,9 @@ def test_every_level_lands_inside_its_bracket_on_a_single_cut_surface(surface):
             f"level {level} measured {sizes.sum():,} bytes, predicted "
             f"{layer.bytes_low:,}..{layer.bytes_high:,}"
         )
-        assert layer.cell_bytes_low <= np.percentile(sizes, 95) <= layer.cell_bytes_high, (
+        assert (
+            layer.cell_bytes_low <= np.percentile(sizes, 95) <= layer.cell_bytes_high
+        ), (
             f"level {level} p95 measured {np.percentile(sizes, 95):,.0f}, predicted "
             f"{layer.cell_bytes_low:,}..{layer.cell_bytes_high:,}"
         )

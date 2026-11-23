@@ -66,7 +66,14 @@ def ensure_collection() -> fabriks.Collection:
     store = fabriks.DirectoryStore(OUTPUT, create=True)
     if not (OUTPUT / COLLECTION / "fabriks.json").is_file():
         print(f"No collection at {OUTPUT / COLLECTION}, writing one first...")
-        fabriks.write_meshes(demo_objects(), store, prefix=COLLECTION, cell_size=CELL_SIZE, levels=LEVELS, axes=("x", "y", "z"))
+        fabriks.write_meshes(
+            demo_objects(),
+            store,
+            prefix=COLLECTION,
+            cell_size=CELL_SIZE,
+            levels=LEVELS,
+            axes=("x", "y", "z"),
+        )
 
     return fabriks.open_collection(store, COLLECTION)
 
@@ -87,11 +94,15 @@ def blob_bytes(collection: fabriks.Collection) -> dict[tuple[int, int], int]:
         table = collection.geometry(level)
         for row in range(table.num_rows):
             key = (level, table.column("cell")[row].as_py())
-            sizes[key] = len(table.column("positions")[row].as_py()) + len(table.column("indices")[row].as_py())
+            sizes[key] = len(table.column("positions")[row].as_py()) + len(
+                table.column("indices")[row].as_py()
+            )
     return sizes
 
 
-def summarise(collection: fabriks.Collection, plan: list[fabriks.CellEntry], sizes: dict) -> tuple[int, int, str]:
+def summarise(
+    collection: fabriks.Collection, plan: list[fabriks.CellEntry], sizes: dict
+) -> tuple[int, int, str]:
     """The three numbers that matter about a plan: cells, faces, bytes -- plus its level mix."""
     faces = sum(entry.face_count for entry in plan)
     payload = sum(sizes.get((entry.level, entry.cell), 0) for entry in plan)
@@ -113,13 +124,17 @@ def main() -> None:
     # 1. The pyramid.
     # ---------------------------------------------------------------- #
     rule("1. What each level costs")
-    print(f"{'level':>6}  {'cells':>6}  {'faces':>8}  {'bytes':>9}  {'lod_error (voxels)':>20}")
+    print(
+        f"{'level':>6}  {'cells':>6}  {'faces':>8}  {'bytes':>9}  {'lod_error (voxels)':>20}"
+    )
     for level in range(collection.grid.levels):
         entries = collection.cells_at(level)
         payload = sum(sizes[(level, entry.cell)] for entry in entries)
         errors = [entry.lod_error for entry in entries]
-        print(f"{level:>6}  {len(entries):>6}  {sum(e.face_count for e in entries):>8}  {payload:>9,}  "
-              f"{min(errors):>9.4f} .. {max(errors):<8.4f}")
+        print(
+            f"{level:>6}  {len(entries):>6}  {sum(e.face_count for e in entries):>8}  {payload:>9,}  "
+            f"{min(errors):>9.4f} .. {max(errors):<8.4f}"
+        )
 
     print(
         f"\n`lod_error` is an upper bound on how far this level's surface strays from level 0:\n"
@@ -138,11 +153,15 @@ def main() -> None:
     # 2. A budget in voxels.
     # ---------------------------------------------------------------- #
     rule("2. Spending the budget in voxels, with no camera at all")
-    print(f"{'error_budget':>13}  {'cells':>6}  {'faces':>8}  {'bytes':>9}  {'of full':>8}  levels")
+    print(
+        f"{'error_budget':>13}  {'cells':>6}  {'faces':>8}  {'bytes':>9}  {'of full':>8}  levels"
+    )
     for budget in (0.0, 1.0, 5.0, 20.0, 50.0, 200.0):
         plan = collection.plan(error_budget=budget)
         faces, payload, mix = summarise(collection, plan, sizes)
-        print(f"{budget:>13.2f}  {len(plan):>6}  {faces:>8}  {payload:>9,}  {payload / full_bytes:>7.0%}  {mix}")
+        print(
+            f"{budget:>13.2f}  {len(plan):>6}  {faces:>8}  {payload:>9,}  {payload / full_bytes:>7.0%}  {mix}"
+        )
 
     print(
         "\nScale-free, and what you want for a batch export or a fixed-detail fetch. The plan\n"
@@ -157,16 +176,22 @@ def main() -> None:
     high = np.max([entry.bbox_max for entry in collection.cells.values()], axis=0)
     centre = (low + high) / 2
     span = float(np.linalg.norm(high - low))
-    print(f"the collection spans {np.round(low, 0).tolist()} .. {np.round(high, 0).tolist()} voxels\n")
+    print(
+        f"the collection spans {np.round(low, 0).tolist()} .. {np.round(high, 0).tolist()} voxels\n"
+    )
 
     print("pulling back along +z, accepting 8 pixels of error:\n")
-    print(f"{'distance':>9}  {'cells':>6}  {'faces':>8}  {'bytes':>9}  {'of full':>8}  levels")
+    print(
+        f"{'distance':>9}  {'cells':>6}  {'faces':>8}  {'bytes':>9}  {'of full':>8}  levels"
+    )
     for factor in (0.05, 0.2, 0.5, 1.0, 2.0, 5.0):
         eye = centre + np.array([0.0, 0.0, span * factor])
         camera = fabriks.Camera.perspective(eye, fov_y=0.8, viewport_height=1080)
         plan = collection.plan(camera=camera, pixel_budget=8.0)
         faces, payload, mix = summarise(collection, plan, sizes)
-        print(f"{span * factor:>9.0f}  {len(plan):>6}  {faces:>8}  {payload:>9,}  {payload / full_bytes:>7.0%}  {mix}")
+        print(
+            f"{span * factor:>9.0f}  {len(plan):>6}  {faces:>8}  {payload:>9,}  {payload / full_bytes:>7.0%}  {mix}"
+        )
 
     print(
         "\nThe payload falls away as the camera pulls back --\n"
@@ -180,23 +205,37 @@ def main() -> None:
     eye = np.array([low[0] + 60.0, centre[1], centre[2]])
     camera = fabriks.Camera.perspective(eye, fov_y=0.8, viewport_height=1080)
 
-    print(f"{'pixel_budget':>13}  {'cells':>6}  {'faces':>8}  {'bytes':>9}  {'of full':>8}  levels")
+    print(
+        f"{'pixel_budget':>13}  {'cells':>6}  {'faces':>8}  {'bytes':>9}  {'of full':>8}  levels"
+    )
     for budget in (0.5, 2.0, 8.0, 40.0, 200.0):
         plan = collection.plan(camera=camera, pixel_budget=budget)
         faces, payload, mix = summarise(collection, plan, sizes)
-        print(f"{budget:>13.1f}  {len(plan):>6}  {faces:>8}  {payload:>9,}  {payload / full_bytes:>7.0%}  {mix}")
+        print(
+            f"{budget:>13.1f}  {len(plan):>6}  {faces:>8}  {payload:>9,}  {payload / full_bytes:>7.0%}  {mix}"
+        )
 
     mixed = collection.plan(camera=camera, pixel_budget=40.0)
     if len({entry.level for entry in mixed}) > 1:
-        print("\nA mixed plan: near cells at a fine level, far ones coarse, in one fetch. The near/far")
+        print(
+            "\nA mixed plan: near cells at a fine level, far ones coarse, in one fetch. The near/far"
+        )
         print("split, by distance from the eye:")
-        for entry in sorted(mixed, key=lambda e: np.linalg.norm(np.asarray(e.bbox_min) - eye))[:4]:
+        for entry in sorted(
+            mixed, key=lambda e: np.linalg.norm(np.asarray(e.bbox_min) - eye)
+        )[:4]:
             distance = float(np.linalg.norm(np.asarray(entry.bbox_min) - eye))
-            print(f"  {distance:7.0f} voxels away -> level {entry.level}  ({entry.face_count:5d} faces)")
+            print(
+                f"  {distance:7.0f} voxels away -> level {entry.level}  ({entry.face_count:5d} faces)"
+            )
         print("  ...")
-        for entry in sorted(mixed, key=lambda e: -np.linalg.norm(np.asarray(e.bbox_min) - eye))[:2]:
+        for entry in sorted(
+            mixed, key=lambda e: -np.linalg.norm(np.asarray(e.bbox_min) - eye)
+        )[:2]:
             distance = float(np.linalg.norm(np.asarray(entry.bbox_min) - eye))
-            print(f"  {distance:7.0f} voxels away -> level {entry.level}  ({entry.face_count:5d} faces)")
+            print(
+                f"  {distance:7.0f} voxels away -> level {entry.level}  ({entry.face_count:5d} faces)"
+            )
 
     print(
         "\nThis is why the boundary is LOCKED. Two neighbouring cells here are drawn at\n"
@@ -230,13 +269,19 @@ def main() -> None:
 
     isolated = collection.plan(objects=[object_id], error_budget=0.0)
     faces, payload, mix = summarise(collection, isolated, sizes)
-    print(f"object {object_id}: the object catalog names {len(entry.cells)} cells for it")
-    print(f"  fetching it at full detail: {len(isolated)} cells, {faces} faces, {payload:,} bytes "
-          f"({payload / full_bytes:.1%} of the collection)")
+    print(
+        f"object {object_id}: the object catalog names {len(entry.cells)} cells for it"
+    )
+    print(
+        f"  fetching it at full detail: {len(isolated)} cells, {faces} faces, {payload:,} bytes "
+        f"({payload / full_bytes:.1%} of the collection)"
+    )
 
     coarse = collection.plan(objects=[object_id], error_budget=200.0)
     faces, payload, mix = summarise(collection, coarse, sizes)
-    print(f"  ... and coarsely        : {len(coarse)} cells, {faces} faces, {payload:,} bytes  [{mix}]")
+    print(
+        f"  ... and coarsely        : {len(coarse)} cells, {faces} faces, {payload:,} bytes  [{mix}]"
+    )
 
     print(
         "\nThe forward direction -- which objects are in this cell -- already lives in the\n"
@@ -265,9 +310,16 @@ def compare_backends() -> None:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             built = fabriks.build_collection(
-                objects, cell_size=CELL_SIZE, levels=LEVELS, simplifier=name, axes=("x", "y", "z")
+                objects,
+                cell_size=CELL_SIZE,
+                levels=LEVELS,
+                simplifier=name,
+                axes=("x", "y", "z"),
             )
-        faces = [sum(shard.column("index_count").to_pylist()) // 3 for _, shard in built.shards]
+        faces = [
+            sum(shard.column("index_count").to_pylist()) // 3
+            for _, shard in built.shards
+        ]
         worst = max(built.cell_catalog.column("lod_error").to_pylist())
         print(f"{name:>22}  {faces!s:>28}  {worst:>16.3f}")
 

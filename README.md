@@ -67,7 +67,6 @@ manifest = fabriks.write_meshes(
     axes=("x", "y", "z"),
     **grid_plan.as_kwargs(),
 )
-
 ```
 
 ---
@@ -91,7 +90,6 @@ for cell in collection.read_cells([(e.level, e.cell) for e in plan]):
 # Reassemble single object across cells
 mesh = collection.object_mesh(7)
 collection.release()
-
 ```
 
 **Async Reading**
@@ -100,7 +98,6 @@ collection.release()
 collection = await fabriks.aopen_collection(S3Store(...), "my-collection")
 plan = collection.plan(camera=camera)
 cells = await collection.aread_cells([(e.level, e.cell) for e in plan], concurrency=16)
-
 ```
 
 ---
@@ -116,8 +113,9 @@ import fabriks
 imported = read_glb("bunny.glb", store, "bunny", levels=4)
 
 collection = fabriks.open_collection(store, "bunny")
-blob = write_obj(collection, level=2)          # or write to a path: write_obj(collection, "out.obj")
-
+blob = write_obj(
+    collection, level=2
+)  # or write to a path: write_obj(collection, "out.obj")
 ```
 
 | Format | Identity | Notes |
@@ -154,10 +152,11 @@ blob = write_obj(collection, level=2)          # or write to a path: write_obj(c
 **Verification**
 
 ```python
-report = fabriks.verify(collection, tier="geometry")  # "structure" | "blobs" | "geometry"
+report = fabriks.verify(
+    collection, tier="geometry"
+)  # "structure" | "blobs" | "geometry"
 if not report:
     print(report)
-
 ```
 
 ---

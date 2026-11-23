@@ -34,6 +34,7 @@ def default_simplification() -> str:
         return SIMPLIFICATION_MESHOPT
     return SIMPLIFICATION_QUADRIC
 
+
 #: Every backend that ships, keyed by the ``simplification`` value that selects it.
 _SIMPLIFIERS: dict[str, type[Simplifier]] = {
     SIMPLIFICATION_MESHOPT: MeshoptSimplifier,
@@ -115,7 +116,9 @@ def simplify_to_target(
             return result, attempt != target_faces
         attempt *= 2
 
-    return Simplified(vertices, faces, 0.0, False, getattr(simplifier, "name", "")), True
+    return Simplified(
+        vertices, faces, 0.0, False, getattr(simplifier, "name", "")
+    ), True
 
 
 __all__ = [

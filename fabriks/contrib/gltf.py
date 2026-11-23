@@ -86,7 +86,10 @@ def read_gltf(
     if isinstance(source, Mapping):
         document, resolver = _unpack(source)
         return _scene.import_scene(
-            _scene.load_scene(document, FILE_TYPE_GLTF, resolver=resolver), store, prefix, **options
+            _scene.load_scene(document, FILE_TYPE_GLTF, resolver=resolver),
+            store,
+            prefix,
+            **options,
         )
 
     if isinstance(source, (bytes, bytearray)):

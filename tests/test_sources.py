@@ -49,7 +49,9 @@ def test_bounds_match_trimeshs_attribute():
 
 def test_an_empty_mesh_has_bounds_rather_than_raising():
     """A degenerate object should not take out the whole build with an axis-0 reduction."""
-    low, high = Mesh(vertices=np.zeros((0, 3)), faces=np.zeros((0, 3), dtype=np.int64)).bounds
+    low, high = Mesh(
+        vertices=np.zeros((0, 3)), faces=np.zeros((0, 3), dtype=np.int64)
+    ).bounds
 
     assert low.tolist() == [0.0, 0.0, 0.0]
     assert high.tolist() == [0.0, 0.0, 0.0]

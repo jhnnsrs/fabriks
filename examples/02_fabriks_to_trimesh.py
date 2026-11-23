@@ -66,7 +66,14 @@ def ensure_collection() -> fabriks.Collection:
     store = fabriks.DirectoryStore(OUTPUT, create=True)
     if not (OUTPUT / COLLECTION / "fabriks.json").is_file():
         print(f"No collection at {OUTPUT / COLLECTION}, writing one first...")
-        fabriks.write_meshes(demo_objects(), store, prefix=COLLECTION, cell_size=CELL_SIZE, levels=LEVELS, axes=("x", "y", "z"))
+        fabriks.write_meshes(
+            demo_objects(),
+            store,
+            prefix=COLLECTION,
+            cell_size=CELL_SIZE,
+            levels=LEVELS,
+            axes=("x", "y", "z"),
+        )
 
     return fabriks.open_collection(store, COLLECTION)
 
@@ -89,8 +96,12 @@ def main() -> None:
     # Everything needed to decode the geometry travels next to the geometry -- that is what
     # makes a collection one store rather than a handful, and it is read from `fabriks.json`
     # alone, before a single Parquet file is opened.
-    print(f"grid      : cell_size={collection.grid.cell_size} (x, y, z), levels={collection.grid.levels}")
-    print(f"encoding  : codec={collection.encoding.codec}, positions={collection.encoding.positions}")
+    print(
+        f"grid      : cell_size={collection.grid.cell_size} (x, y, z), levels={collection.grid.levels}"
+    )
+    print(
+        f"encoding  : codec={collection.encoding.codec}, positions={collection.encoding.positions}"
+    )
     print(f"counts    : {collection.manifest.counts}")
     print(f"objects   : {len(collection.objects)} in the identity index")
     print(f"cells     : {len(collection.cells)} in the spatial index")
@@ -110,9 +121,13 @@ def main() -> None:
     mesh = collection.object_mesh(object_id, level=0)  # a fabriks.Mesh
     as_trimesh = mesh.as_trimesh()  # ... and now a trimesh.Trimesh
 
-    print(f"\nreassembled: {len(as_trimesh.vertices)} vertices, {len(as_trimesh.faces)} faces")
+    print(
+        f"\nreassembled: {len(as_trimesh.vertices)} vertices, {len(as_trimesh.faces)} faces"
+    )
     print(f"type       : {type(as_trimesh).__module__}.{type(as_trimesh).__name__}")
-    print(f"volume     : {as_trimesh.volume:.1f} voxels^3 (the source's is {sources[object_id].volume:.1f})")
+    print(
+        f"volume     : {as_trimesh.volume:.1f} voxels^3 (the source's is {sources[object_id].volume:.1f})"
+    )
 
     # ---------------------------------------------------------------- #
     # How lossy is it? Bounded, and by a number you can state up front.
@@ -122,9 +137,15 @@ def main() -> None:
     quantum = np.asarray(collection.grid.cell_extent(0)) / 65535
 
     print(f"one quantum at level 0 : {np.round(quantum, 5).tolist()} voxels")
-    print(f"source bounds          : {np.round(source.bounds[0], 4).tolist()} .. {np.round(source.bounds[1], 4).tolist()}")
-    print(f"decoded bounds         : {np.round(mesh.bounds[0], 4).tolist()} .. {np.round(mesh.bounds[1], 4).tolist()}")
-    print(f"worst corner error     : {float(np.abs(np.asarray(mesh.bounds) - np.asarray(source.bounds)).max()):.6f} voxels")
+    print(
+        f"source bounds          : {np.round(source.bounds[0], 4).tolist()} .. {np.round(source.bounds[1], 4).tolist()}"
+    )
+    print(
+        f"decoded bounds         : {np.round(mesh.bounds[0], 4).tolist()} .. {np.round(mesh.bounds[1], 4).tolist()}"
+    )
+    print(
+        f"worst corner error     : {float(np.abs(np.asarray(mesh.bounds) - np.asarray(source.bounds)).max()):.6f} voxels"
+    )
     print(
         "\nPositions are quantized per cell, against the cell's own grid box rather than the\n"
         "data's bounding box -- which is what lets a decoder invert them from `level` and\n"
@@ -142,12 +163,16 @@ def main() -> None:
     target = shared[0] if shared else collection.cells_at(0)[0]
 
     decoded = collection.read_cell(target.level, target.cell)
-    print(f"cell {target.cell} at level {target.level}: {len(decoded.vertices)} vertices, "
-          f"{len(decoded.faces)} faces, {len(decoded)} objects {decoded.object_ids}")
+    print(
+        f"cell {target.cell} at level {target.level}: {len(decoded.vertices)} vertices, "
+        f"{len(decoded.faces)} faces, {len(decoded)} objects {decoded.object_ids}"
+    )
 
     for held in decoded.object_ids:
         piece = decoded.object_mesh(held)
-        print(f"  object {held:5d}: {len(piece.vertices):4d} vertices, {len(piece.faces):4d} faces")
+        print(
+            f"  object {held:5d}: {len(piece.vertices):4d} vertices, {len(piece.faces):4d} faces"
+        )
     print(
         "\nThe stored indices are cell-global -- an object's faces are offset by its own vertex\n"
         "start, not local to it -- so slicing one object out means subtracting that start back\n"
@@ -164,13 +189,17 @@ def main() -> None:
             for entry in collection.cells_at(level)
         ]
         combined = trimesh.util.concatenate(pieces)
-        print(f"level {level}: {len(collection.cells_at(level)):3d} cells -> one mesh of "
-              f"{len(combined.faces):6d} faces")
+        print(
+            f"level {level}: {len(collection.cells_at(level)):3d} cells -> one mesh of "
+            f"{len(combined.faces):6d} faces"
+        )
 
         if level == collection.grid.levels - 1:
             exported = OUTPUT / f"level-{level}.obj"
             exported.write_text(trimesh.exchange.obj.export_obj(combined))
-            print(f"        exported the coarsest level to {exported.name} ({megabytes(exported.stat().st_size)})")
+            print(
+                f"        exported the coarsest level to {exported.name} ({megabytes(exported.stat().st_size)})"
+            )
 
     print(
         "\nThat is the batch-export case, and note what it costs: reading every cell at a level\n"

@@ -33,7 +33,10 @@ FILE_TYPE_OFF = "off"
 
 
 def read_ply(
-    source: Source, store: FabriksStore, prefix: str = "", **options: Unpack[ReadOptions]
+    source: Source,
+    store: FabriksStore,
+    prefix: str = "",
+    **options: Unpack[ReadOptions],
 ) -> Imported:
     """Read a PLY file into a collection holding one object.
 
@@ -51,12 +54,17 @@ def write_ply(
 
     See :class:`~fabriks.contrib.scene.WriteOptions` for the keyword arguments.
     """
-    written = _scene.write_scene(collection, target, FILE_TYPE_PLY, merge=True, **options)
+    written = _scene.write_scene(
+        collection, target, FILE_TYPE_PLY, merge=True, **options
+    )
     return _scene.single_file(written, FILE_TYPE_PLY)
 
 
 def read_stl(
-    source: Source, store: FabriksStore, prefix: str = "", **options: Unpack[ReadOptions]
+    source: Source,
+    store: FabriksStore,
+    prefix: str = "",
+    **options: Unpack[ReadOptions],
 ) -> Imported:
     """Read an STL file into a collection holding one object.
 
@@ -74,12 +82,17 @@ def write_stl(
 
     See :class:`~fabriks.contrib.scene.WriteOptions` for the keyword arguments.
     """
-    written = _scene.write_scene(collection, target, FILE_TYPE_STL, merge=True, **options)
+    written = _scene.write_scene(
+        collection, target, FILE_TYPE_STL, merge=True, **options
+    )
     return _scene.single_file(written, FILE_TYPE_STL)
 
 
 def read_off(
-    source: Source, store: FabriksStore, prefix: str = "", **options: Unpack[ReadOptions]
+    source: Source,
+    store: FabriksStore,
+    prefix: str = "",
+    **options: Unpack[ReadOptions],
 ) -> Imported:
     """Read an OFF file into a collection holding one object.
 
@@ -97,7 +110,9 @@ def write_off(
 
     See :class:`~fabriks.contrib.scene.WriteOptions` for the keyword arguments.
     """
-    written = _scene.write_scene(collection, target, FILE_TYPE_OFF, merge=True, **options)
+    written = _scene.write_scene(
+        collection, target, FILE_TYPE_OFF, merge=True, **options
+    )
     return _scene.single_file(written, FILE_TYPE_OFF)
 
 

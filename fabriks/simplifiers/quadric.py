@@ -105,7 +105,9 @@ class QuadricSimplifier:
             # A pinned vertex moved or vanished, which is a crack between levels rather than a
             # quality regression -- and, moved outward, a vertex its own cell cannot quantize.
             # Hand the piece to the fallback rather than shipping it.
-            return self.fallback.simplify(source_vertices, source_faces, fixed=fixed, target_faces=target_faces)
+            return self.fallback.simplify(
+                source_vertices, source_faces, fixed=fixed, target_faces=target_faces
+            )
 
         return Simplified(
             vertices=kept_vertices,

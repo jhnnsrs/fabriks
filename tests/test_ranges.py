@@ -47,9 +47,9 @@ def wide_objects() -> dict[int, Any]:
     lives and where row-group granularity is the thing actually being measured.
     """
     return {
-        1000 + index * 7: trimesh.creation.icosphere(radius=30.0, subdivisions=3).apply_translation(
-            [60.0 + index * 70.0, 80.0, 60.0]
-        )
+        1000 + index * 7: trimesh.creation.icosphere(
+            radius=30.0, subdivisions=3
+        ).apply_translation([60.0 + index * 70.0, 80.0, 60.0])
         for index in range(24)
     }
 
@@ -59,7 +59,9 @@ def wide(wide_objects: dict[int, Any]) -> fabriks.MeshCollection:
     """The larger collection, built once for the whole session."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        return fabriks.build_collection(wide_objects, cell_size=CELL_SIZE, levels=LEVELS, axes=("x", "y", "z"))
+        return fabriks.build_collection(
+            wide_objects, cell_size=CELL_SIZE, levels=LEVELS, axes=("x", "y", "z")
+        )
 
 
 @pytest.fixture()
@@ -74,12 +76,16 @@ def chunked(wide: fabriks.MeshCollection) -> AccountingStore:
 
 def level_bytes(store: AccountingStore, level: int = 0) -> int:
     """How large one level is on disk -- the transfer a reader used to pay to draw one cell."""
-    return sum(len(body) for path, body in store.objects.items() if f"level{level}/" in path)
+    return sum(
+        len(body) for path, body in store.objects.items() if f"level{level}/" in path
+    )
 
 
 def row_groups(collection: fabriks.Collection, level: int = 0) -> int:
     """How many row groups a level was written in."""
-    return sum(entry.row_groups or 0 for entry in collection.manifest.level_files(level) or [])
+    return sum(
+        entry.row_groups or 0 for entry in collection.manifest.level_files(level) or []
+    )
 
 
 @pytest.fixture()
@@ -94,7 +100,8 @@ def measured(chunked: AccountingStore) -> fabriks.Collection:
 def a_level_zero_cell(collection: fabriks.Collection) -> fabriks.CellEntry:
     """The first level-0 cell in Morton order, which is a cell like any other."""
     return min(
-        (entry for entry in collection.cells.values() if entry.level == 0), key=lambda e: e.cell
+        (entry for entry in collection.cells.values() if entry.level == 0),
+        key=lambda e: e.cell,
     )
 
 
@@ -141,7 +148,9 @@ def test_reading_a_cell_costs_about_one_row_group(
         f"level and caching it would look free on every later read and cost this on the first, "
         f"which is exactly the behaviour the locator replaced."
     )
-    assert warm <= cold, "the second read must not re-parse the footer the first one parsed"
+    assert warm <= cold, (
+        "the second read must not re-parse the footer the first one parsed"
+    )
     assert warm < 2 * share, (
         f"a warm cell read moved {warm} bytes where an even row-group share of this level is "
         f"{share:.0f} ({whole} bytes in {groups} row groups)"
@@ -163,7 +172,9 @@ def test_a_located_read_beats_reading_the_level_whole(
     measured.geometry(0)
     whole = chunked.bytes_read()
 
-    assert located < whole, f"a located read moved {located} bytes, reading the level moved {whole}"
+    assert located < whole, (
+        f"a located read moved {located} bytes, reading the level moved {whole}"
+    )
 
 
 def test_reading_a_plan_shares_a_row_group_between_the_cells_in_it(
@@ -175,7 +186,9 @@ def test_reading_a_plan_shares_a_row_group_between_the_cells_in_it(
     one read of it. Reading the same keys one at a time is the baseline it has to beat.
     """
     keys = [(entry.level, entry.cell) for entry in measured.plan(error_budget=0.4)]
-    assert len(keys) > 1, "the fixture must plan more than one cell for this to mean anything"
+    assert len(keys) > 1, (
+        "the fixture must plan more than one cell for this to mean anything"
+    )
 
     batched = list(measured.read_cells(keys))
     batched_reads, batched_bytes = len(chunked.reads), chunked.bytes_read()
@@ -218,7 +231,9 @@ def test_every_cell_with_geometry_is_located(measured: fabriks.Collection):
     assert not unlocated, f"these cells carry no locator: {unlocated[:5]}"
 
 
-def test_every_cell_reads_back_as_the_size_its_catalog_row_claims(measured: fabriks.Collection):
+def test_every_cell_reads_back_as_the_size_its_catalog_row_claims(
+    measured: fabriks.Collection,
+):
     """Read every cell through its locator and check it against what the catalog said.
 
     Note what is *not* asserted: that ``decoded.cell == entry.cell``. The reader sets that from
@@ -251,9 +266,13 @@ def test_a_locator_pointing_at_the_wrong_row_group_is_caught(chunked: Accounting
     groups = catalog.column("row_group").to_pylist()
     levels = catalog.column("level").to_pylist()
     row = next(
-        i for i, (level, group) in enumerate(zip(levels, groups)) if level == 0 and group == 0
+        i
+        for i, (level, group) in enumerate(zip(levels, groups))
+        if level == 0 and group == 0
     )
-    moved = [max(groups) if index == row else group for index, group in enumerate(groups)]
+    moved = [
+        max(groups) if index == row else group for index, group in enumerate(groups)
+    ]
     corrupted = catalog.set_column(
         catalog.schema.get_field_index("row_group"),
         catalog.schema.field("row_group"),
@@ -262,7 +281,9 @@ def test_a_locator_pointing_at_the_wrong_row_group_is_caught(chunked: Accounting
     chunked.objects["c/catalog/cells.parquet"] = table_to_parquet(corrupted)
 
     opened = fabriks.open_collection(chunked, "c")
-    entry = opened.cells[(int(levels[row]), int(catalog.column("cell").to_pylist()[row]))]
+    entry = opened.cells[
+        (int(levels[row]), int(catalog.column("cell").to_pylist()[row]))
+    ]
 
     with pytest.raises(fabriks.FormatError, match="catalog and the geometry disagree"):
         opened.read_cell(entry.level, entry.cell)
@@ -342,7 +363,9 @@ def test_a_store_that_cannot_range_read_still_reads(collection: fabriks.MeshColl
     assert len(decoded.vertices) == entry.vertex_count
 
 
-def test_releasing_drops_the_geometry_and_keeps_the_catalogs(measured: fabriks.Collection):
+def test_releasing_drops_the_geometry_and_keeps_the_catalogs(
+    measured: fabriks.Collection,
+):
     """A long-lived viewer must be able to let go of levels without re-opening the collection."""
     measured.geometry(0)
     entry = a_level_zero_cell(measured)
@@ -351,8 +374,12 @@ def test_releasing_drops_the_geometry_and_keeps_the_catalogs(measured: fabriks.C
     measured.release()
 
     assert not measured._level_tables and not measured._parquet_files
-    assert measured.cells, "the spatial index is small and a planner needs it every frame"
-    assert len(measured.read_cell(entry.level, entry.cell).vertices) == entry.vertex_count
+    assert measured.cells, (
+        "the spatial index is small and a planner needs it every frame"
+    )
+    assert (
+        len(measured.read_cell(entry.level, entry.cell).vertices) == entry.vertex_count
+    )
 
 
 def test_the_round_trip_is_unchanged_by_how_finely_it_was_chunked(
@@ -363,7 +390,10 @@ def test_the_round_trip_is_unchanged_by_how_finely_it_was_chunked(
     fabriks.write_collection(collection, coarse, "c", row_group_bytes=1024 * 1024)
     fabriks.write_collection(collection, fine, "c", row_group_bytes=1024)
 
-    one, other = fabriks.open_collection(coarse, "c"), fabriks.open_collection(fine, "c")
+    one, other = (
+        fabriks.open_collection(coarse, "c"),
+        fabriks.open_collection(fine, "c"),
+    )
 
     assert set(one.cells) == set(other.cells)
     for key in sorted(one.cells):

@@ -69,7 +69,6 @@ def _simplify_with_attributes() -> Any:  # noqa: ANN401
     return function
 
 
-
 @dataclass(frozen=True)
 class MeshoptSimplifier:
     """Edge collapse via meshoptimizer, holding exactly the ``fixed`` mask still.
@@ -142,8 +141,12 @@ class MeshoptSimplifier:
         kept_vertices = source_vertices[used]
         kept_faces = compact.reshape(-1, 3).astype(np.int64)
 
-        if self.verify_border and not pinned_held(source_vertices, kept_vertices, fixed):
-            return self.fallback.simplify(source_vertices, source_faces, fixed=fixed, target_faces=target_faces)
+        if self.verify_border and not pinned_held(
+            source_vertices, kept_vertices, fixed
+        ):
+            return self.fallback.simplify(
+                source_vertices, source_faces, fixed=fixed, target_faces=target_faces
+            )
 
         return Simplified(
             vertices=kept_vertices,

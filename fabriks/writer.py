@@ -81,10 +81,15 @@ def _plan_parts(shard: pa.Table, max_part_bytes: int) -> list[pa.Table]:
     sizes = blob_sizes(shard)
     if sum(sizes) <= max_part_bytes:
         return [shard]
-    return [shard.slice(start, count) for start, count in plan_byte_chunks(sizes, max_part_bytes)]
+    return [
+        shard.slice(start, count)
+        for start, count in plan_byte_chunks(sizes, max_part_bytes)
+    ]
 
 
-def _locate(shard: pa.Table, part: int, chunks: Sequence[tuple[int, int]]) -> dict[tuple[int, int], tuple[int, int, int]]:
+def _locate(
+    shard: pa.Table, part: int, chunks: Sequence[tuple[int, int]]
+) -> dict[tuple[int, int], tuple[int, int, int]]:
     """Map each cell in a written part to the part and row group a reader must fetch for it."""
     keys = _keys(shard)
     sizes = blob_sizes(shard)
@@ -95,7 +100,9 @@ def _locate(shard: pa.Table, part: int, chunks: Sequence[tuple[int, int]]) -> di
     return found
 
 
-def _with_locators(catalog: pa.Table, locators: Mapping[tuple[int, int], tuple[int, int, int]]) -> pa.Table:
+def _with_locators(
+    catalog: pa.Table, locators: Mapping[tuple[int, int], tuple[int, int, int]]
+) -> pa.Table:
     """Fill the cell catalog's ``part`` / ``row_group`` / ``blob_bytes`` from what was written.
 
     A cell the geometry does not hold keeps its nulls rather than being dropped or defaulted:
@@ -107,13 +114,21 @@ def _with_locators(catalog: pa.Table, locators: Mapping[tuple[int, int], tuple[i
 
     resolved = [locators.get(key) for key in _keys(catalog)]
     columns = {
-        "part": pa.array([None if item is None else item[0] for item in resolved], type=pa.int32()),
-        "row_group": pa.array([None if item is None else item[1] for item in resolved], type=pa.int32()),
-        "blob_bytes": pa.array([None if item is None else item[2] for item in resolved], type=pa.int64()),
+        "part": pa.array(
+            [None if item is None else item[0] for item in resolved], type=pa.int32()
+        ),
+        "row_group": pa.array(
+            [None if item is None else item[1] for item in resolved], type=pa.int32()
+        ),
+        "blob_bytes": pa.array(
+            [None if item is None else item[2] for item in resolved], type=pa.int64()
+        ),
     }
     filled = catalog
     for name, values in columns.items():
-        filled = filled.set_column(filled.schema.get_field_index(name), catalog.schema.field(name), values)
+        filled = filled.set_column(
+            filled.schema.get_field_index(name), catalog.schema.field(name), values
+        )
     return filled
 
 
@@ -156,16 +171,23 @@ def write_collection(
     for level, shard in sorted(collection.shards, key=lambda item: item[0]):
         entries: list[FileEntry] = []
         for number, part in enumerate(_plan_parts(shard, max_part_bytes)):
-            body, chunks = table_to_chunked_parquet(part, row_group_bytes=row_group_bytes, compression=parquet_compression)
+            body, chunks = table_to_chunked_parquet(
+                part, row_group_bytes=row_group_bytes, compression=parquet_compression
+            )
             path = level_part_path(level, number)
             put_bytes(store, join(prefix, path), body)
             entries.append(FileEntry(path=path, size=len(body), row_groups=len(chunks)))
             locators.update(_locate(part, number, chunks))
         levels[str(level)] = [entry.to_dict() for entry in entries]
 
-    catalog = table_to_parquet(_with_locators(collection.cell_catalog, locators), compression=parquet_compression)
+    catalog = table_to_parquet(
+        _with_locators(collection.cell_catalog, locators),
+        compression=parquet_compression,
+    )
     put_bytes(store, join(prefix, CELL_CATALOG_PATH), catalog)
-    objects = table_to_parquet(collection.object_catalog, compression=parquet_compression)
+    objects = table_to_parquet(
+        collection.object_catalog, compression=parquet_compression
+    )
     put_bytes(store, join(prefix, OBJECT_CATALOG_PATH), objects)
 
     written: dict[str, Any] = {
@@ -252,4 +274,9 @@ def write_meshes(
     )
 
 
-__all__ = ["DEFAULT_MAX_PART_BYTES", "awrite_collection", "write_collection", "write_meshes"]
+__all__ = [
+    "DEFAULT_MAX_PART_BYTES",
+    "awrite_collection",
+    "write_collection",
+    "write_meshes",
+]

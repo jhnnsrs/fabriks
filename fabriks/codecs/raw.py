@@ -30,9 +30,14 @@ class RawCodec:
         """Name the manifest value this implements."""
         return f"RawCodec({self.name!r})"
 
-    def encode_positions(self, quantized: npt.NDArray[np.uint16], *, compression: str) -> bytes:
+    def encode_positions(
+        self, quantized: npt.NDArray[np.uint16], *, compression: str
+    ) -> bytes:
         """Interleave the ``uint16`` triples and hand back the bytes."""
-        return compress(np.ascontiguousarray(quantized, dtype="<u2").reshape(-1).tobytes(), compression)
+        return compress(
+            np.ascontiguousarray(quantized, dtype="<u2").reshape(-1).tobytes(),
+            compression,
+        )
 
     def decode_positions(
         self, blob: bytes, *, compression: str, vertex_count: int | None
@@ -48,14 +53,22 @@ class RawCodec:
             )
         return quantized
 
-    def encode_indices(self, faces: npt.NDArray[np.uint32], *, compression: str, vertex_count: int | None) -> bytes:
+    def encode_indices(
+        self,
+        faces: npt.NDArray[np.uint32],
+        *,
+        compression: str,
+        vertex_count: int | None,
+    ) -> bytes:
         """Flatten the triangle list to little-endian ``uint32``.
 
         ``vertex_count`` is unused here and accepted only so the two codecs take the same
         arguments -- a raw index needs nothing but its own width.
         """
         del vertex_count
-        return compress(np.ascontiguousarray(faces, dtype="<u4").reshape(-1).tobytes(), compression)
+        return compress(
+            np.ascontiguousarray(faces, dtype="<u4").reshape(-1).tobytes(), compression
+        )
 
     def decode_indices(
         self, blob: bytes, *, compression: str, index_count: int | None

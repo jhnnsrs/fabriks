@@ -123,7 +123,9 @@ def verify(collection: Collection, *, tier: str = "blobs") -> VerifyReport:
     if "geometry" in wanted:
         checks.extend(_geometry(collection))
     else:
-        skipped.append("the `geometry` tier, which is what checks `boundary` and `decimation`")
+        skipped.append(
+            "the `geometry` tier, which is what checks `boundary` and `decimation`"
+        )
 
     return VerifyReport(checks=tuple(checks), tier=tier, skipped=tuple(skipped))
 
@@ -159,7 +161,9 @@ def _files_exist(collection: Collection) -> Check:
         collection.manifest.catalog_file("objects", "catalog/objects.parquet").path,
     ]
     for level in range(collection.grid.levels):
-        paths.extend(entry.path for entry in collection.manifest.level_files(level) or [])
+        paths.extend(
+            entry.path for entry in collection.manifest.level_files(level) or []
+        )
     for path in paths:
         try:
             get_range_bytes(collection.store, join(collection.prefix, path), 0, 1)
@@ -194,9 +198,13 @@ def _recorded_lengths_are_right(collection: Collection) -> Check:
             checked += 1
             path = join(collection.prefix, entry.path)
             try:
-                tail = get_range_bytes(collection.store, path, max(0, entry.size - 4), 4)
+                tail = get_range_bytes(
+                    collection.store, path, max(0, entry.size - 4), 4
+                )
             except Exception as error:  # noqa: BLE001 - unreadable is its own answer
-                wrong.append(f"{entry.path} could not be read at its recorded end ({error})")
+                wrong.append(
+                    f"{entry.path} could not be read at its recorded end ({error})"
+                )
                 continue
             if tail != b"PAR1":
                 wrong.append(
@@ -249,10 +257,20 @@ def _child_masks_name_what_exists(collection: Collection) -> Check:
         # a spurious one merely wastes a fetch.
         i, j, k = entry.triple
         octants = (
-            morton_encode_one((2 * i + (octant & 1), 2 * j + ((octant >> 1) & 1), 2 * k + ((octant >> 2) & 1)))
+            morton_encode_one(
+                (
+                    2 * i + (octant & 1),
+                    2 * j + ((octant >> 1) & 1),
+                    2 * k + ((octant >> 2) & 1),
+                )
+            )
             for octant in range(8)
         )
-        real = {(level - 1, child) for child in octants if (level - 1, child) in collection.cells}
+        real = {
+            (level - 1, child)
+            for child in octants
+            if (level - 1, child) in collection.cells
+        }
         claimed = set(entry.children())
         if claimed != real:
             wrong.append(
@@ -279,7 +297,9 @@ def _parents_dominate_their_children(collection: Collection) -> Check:
         for key in entry.children():
             child = collection.cells.get(key)
             if child is not None and child.lod_error > entry.lod_error + 1e-9:
-                wrong.append(f"level {level} cell {cell} ({entry.lod_error:.4g}) < child {key[1]} ({child.lod_error:.4g})")
+                wrong.append(
+                    f"level {level} cell {cell} ({entry.lod_error:.4g}) < child {key[1]} ({child.lod_error:.4g})"
+                )
     return Check(
         name="a parent's error dominates its children's",
         tier="structure",
@@ -321,7 +341,9 @@ def _locators_are_in_range(collection: Collection) -> Check:
             continue
         key = (entry.level, entry.part)
         if key not in groups:
-            wrong.append(f"level {entry.level} cell {entry.cell} names part {entry.part}, which does not exist")
+            wrong.append(
+                f"level {entry.level} cell {entry.cell} names part {entry.part}, which does not exist"
+            )
         elif groups[key] is not None and entry.row_group >= (groups[key] or 0):
             wrong.append(
                 f"level {entry.level} cell {entry.cell} names row group {entry.row_group} of {groups[key]}"
@@ -358,7 +380,9 @@ def _objects_name_cells_that_exist(collection: Collection) -> Check:
     for object_id, entry in collection.objects.items():
         for key in entry.cells:
             if key not in collection.cells:
-                wrong.append(f"object {object_id} names level {key[0]} cell {key[1]}, which is not in the catalog")
+                wrong.append(
+                    f"object {object_id} names level {key[0]} cell {key[1]}, which is not in the catalog"
+                )
     return Check(
         name="the object catalog names cells that exist",
         tier="structure",
@@ -382,7 +406,9 @@ def _blobs(collection: Collection) -> Iterator[Check]:
     identity: list[str] = []
     decoded_cells = 0
 
-    for entry in sorted(collection.cells.values(), key=lambda item: (item.level, item.cell)):
+    for entry in sorted(
+        collection.cells.values(), key=lambda item: (item.level, item.cell)
+    ):
         where = f"level {entry.level} cell {entry.cell}"
         try:
             decoded = collection.read_cell(entry.level, entry.cell)
@@ -391,13 +417,20 @@ def _blobs(collection: Collection) -> Iterator[Check]:
             continue
         decoded_cells += 1
 
-        if len(decoded.vertices) != entry.vertex_count or len(decoded.faces) * 3 != entry.index_count:
+        if (
+            len(decoded.vertices) != entry.vertex_count
+            or len(decoded.faces) * 3 != entry.index_count
+        ):
             counts.append(
                 f"{where} decoded {len(decoded.vertices)}v/{len(decoded.faces) * 3}i against a catalog "
                 f"claiming {entry.vertex_count}v/{entry.index_count}i"
             )
-        if len(decoded.faces) and (decoded.faces.max() >= len(decoded.vertices) or decoded.faces.min() < 0):
-            bounds.append(f"{where} has an index outside its {len(decoded.vertices)} vertices")
+        if len(decoded.faces) and (
+            decoded.faces.max() >= len(decoded.vertices) or decoded.faces.min() < 0
+        ):
+            bounds.append(
+                f"{where} has an index outside its {len(decoded.vertices)} vertices"
+            )
 
         offsets.extend(_offset_problems(decoded, where))
         boxes.extend(_box_problems(collection, entry, decoded, where))
@@ -450,16 +483,25 @@ def _offset_problems(decoded: Any, where: str) -> list[str]:  # noqa: ANN401
         ("index", decoded.object_index_offsets, len(decoded.faces) * 3),
     ):
         if len(offsets) != len(ids):
-            problems.append(f"{where} has {len(offsets)} {name} offsets for {len(ids)} objects")
+            problems.append(
+                f"{where} has {len(offsets)} {name} offsets for {len(ids)} objects"
+            )
             continue
         if list(offsets) != sorted(offsets):
             problems.append(f"{where} has {name} offsets that do not ascend")
         if offsets and (offsets[0] != 0 or offsets[-1] > limit):
-            problems.append(f"{where} has {name} offsets running 0..{limit} outside that range")
+            problems.append(
+                f"{where} has {name} offsets running 0..{limit} outside that range"
+            )
     return problems
 
 
-def _box_problems(collection: Collection, entry: CellEntry, decoded: Any, where: str) -> list[str]:  # noqa: ANN401
+def _box_problems(
+    collection: Collection,
+    entry: CellEntry,
+    decoded: Any,
+    where: str,  # noqa: ANN401
+) -> list[str]:
     """Whether a cell's geometry is inside the box its Morton code addresses.
 
     This is what makes ``cell_size`` checkable at all: a vertex outside its own cell is either
@@ -475,7 +517,12 @@ def _box_problems(collection: Collection, entry: CellEntry, decoded: Any, where:
     return []
 
 
-def _identity_problems(collection: Collection, entry: CellEntry, decoded: Any, where: str) -> list[str]:  # noqa: ANN401
+def _identity_problems(
+    collection: Collection,
+    entry: CellEntry,
+    decoded: Any,
+    where: str,  # noqa: ANN401
+) -> list[str]:
     """Whether the forward and inverted identity indexes say the same thing.
 
     ``object_ids`` inside the geometry row is the forward direction; ``objects.parquet.cells``
@@ -484,15 +531,21 @@ def _identity_problems(collection: Collection, entry: CellEntry, decoded: Any, w
     """
     problems: list[str] = []
     if len(decoded.object_ids) != entry.object_count:
-        problems.append(f"{where} holds {len(decoded.object_ids)} objects against a catalog claiming {entry.object_count}")
+        problems.append(
+            f"{where} holds {len(decoded.object_ids)} objects against a catalog claiming {entry.object_count}"
+        )
     if list(decoded.object_ids) != sorted(decoded.object_ids):
         problems.append(f"{where} lists its object ids out of order")
     for object_id in decoded.object_ids:
         record = collection.objects.get(int(object_id))
         if record is None:
-            problems.append(f"{where} holds object {object_id}, which the object catalog does not list")
+            problems.append(
+                f"{where} holds object {object_id}, which the object catalog does not list"
+            )
         elif (entry.level, entry.cell) not in record.cells:
-            problems.append(f"{where} holds object {object_id}, which does not name this cell")
+            problems.append(
+                f"{where} holds object {object_id}, which does not name this cell"
+            )
     return problems
 
 
@@ -516,10 +569,19 @@ def _coarse_levels_are_smaller(collection: Collection) -> Check:
     it, and the failure this check is for is the *inversion*, where zooming out fetches more.
     """
     faces = {
-        level: sum(entry.index_count for entry in collection.cells.values() if entry.level == level) // 3
+        level: sum(
+            entry.index_count
+            for entry in collection.cells.values()
+            if entry.level == level
+        )
+        // 3
         for level in range(collection.grid.levels)
     }
-    inverted = [level for level in range(1, collection.grid.levels) if faces[level] > faces[level - 1]]
+    inverted = [
+        level
+        for level in range(1, collection.grid.levels)
+        if faces[level] > faces[level - 1]
+    ]
     ratios = ", ".join(
         f"L{level}/L{level - 1}={faces[level] / faces[level - 1]:.2f}"
         for level in range(1, collection.grid.levels)
@@ -530,7 +592,9 @@ def _coarse_levels_are_smaller(collection: Collection) -> Check:
         tier="geometry",
         ok=not inverted,
         detail=f"face counts {faces}; {ratios or 'nothing to compare'}",
-        examples=tuple(f"level {level} is larger than level {level - 1}" for level in inverted),
+        examples=tuple(
+            f"level {level} is larger than level {level - 1}" for level in inverted
+        ),
     )
 
 
@@ -565,10 +629,14 @@ def _boundary_vertices_survive_decimation(collection: Collection) -> Check:
     """
     drifted: list[str] = []
     compared = 0
-    for entry in sorted(collection.cells.values(), key=lambda item: (item.level, item.cell)):
+    for entry in sorted(
+        collection.cells.values(), key=lambda item: (item.level, item.cell)
+    ):
         if entry.level == 0:
             continue
-        children = [collection.cells[key] for key in entry.children() if key in collection.cells]
+        children = [
+            collection.cells[key] for key in entry.children() if key in collection.cells
+        ]
         if not children:
             continue
         _, extent = cell_box(entry.cell, entry.level, collection.grid.cell_size)
@@ -578,7 +646,9 @@ def _boundary_vertices_survive_decimation(collection: Collection) -> Check:
         on_plane_tolerance = 1.0 / QUANT_MAX  # cell-relative: is this on a face?
         try:
             coarse = collection.read_cell(entry.level, entry.cell).vertices
-            fine = np.vstack([collection.read_cell(c.level, c.cell).vertices for c in children])
+            fine = np.vstack(
+                [collection.read_cell(c.level, c.cell).vertices for c in children]
+            )
         except Exception:  # noqa: BLE001, S112 - the blob tier already reported this
             continue
         if not len(coarse) or not len(fine):
@@ -587,8 +657,12 @@ def _boundary_vertices_survive_decimation(collection: Collection) -> Check:
         pinned = coarse[on_planes(coarse, planes, tolerance=on_plane_tolerance)]
         held = fine[on_planes(fine, planes, tolerance=on_plane_tolerance)]
         compared += len(pinned) + len(held)
-        appeared = _count_unmatched(pinned, held, tolerance=2.0 * step) if len(pinned) else 0
-        vanished = _count_unmatched(held, pinned, tolerance=2.0 * step) if len(held) else 0
+        appeared = (
+            _count_unmatched(pinned, held, tolerance=2.0 * step) if len(pinned) else 0
+        )
+        vanished = (
+            _count_unmatched(held, pinned, tolerance=2.0 * step) if len(held) else 0
+        )
         if appeared:
             drifted.append(
                 f"level {entry.level} cell {entry.cell}: {appeared}/{len(pinned)} on-plane vertices "
@@ -627,7 +701,11 @@ def _lod_error_is_a_real_bound(collection: Collection) -> Check:
         except Exception:  # noqa: BLE001, S112 - nothing to compare against
             continue
         for level in range(1, collection.grid.levels):
-            cells = [collection.cells[key] for key in record.cells if key[0] == level and key in collection.cells]
+            cells = [
+                collection.cells[key]
+                for key in record.cells
+                if key[0] == level and key in collection.cells
+            ]
             if not cells:
                 continue
             try:
@@ -638,7 +716,9 @@ def _lod_error_is_a_real_bound(collection: Collection) -> Check:
             distance = _max_surface_distance(coarse, base.vertices, base.faces)
             checked += 1
             if distance > budget:
-                worst.append(f"object {object_id} at level {level} deviates {distance:.4g} against a declared {budget:.4g}")
+                worst.append(
+                    f"object {object_id} at level {level} deviates {distance:.4g} against a declared {budget:.4g}"
+                )
     return Check(
         name="lod_error bounds how far a vertex moved from level 0",
         tier="geometry",
@@ -674,7 +754,9 @@ _CANDIDATE_FACES = 32
 
 
 def _max_surface_distance(
-    query: npt.NDArray[np.float64], vertices: npt.NDArray[np.float64], faces: npt.NDArray[np.int64]
+    query: npt.NDArray[np.float64],
+    vertices: npt.NDArray[np.float64],
+    faces: npt.NDArray[np.int64],
 ) -> float:
     """The furthest any query point sits from the surface those triangles describe.
 
@@ -696,7 +778,12 @@ def _max_surface_distance(
     wanted = min(_CANDIDATE_FACES, len(faces))
     _, candidates = tree.query(query, k=wanted)
     candidates = np.atleast_2d(candidates.reshape(len(query), -1))
-    return float(max(_point_to_faces(point, corners, row) for point, row in zip(query, candidates)))
+    return float(
+        max(
+            _point_to_faces(point, corners, row)
+            for point, row in zip(query, candidates)
+        )
+    )
 
 
 def _point_to_faces(
@@ -732,15 +819,24 @@ def _point_to_faces(
 
 
 def _count_unmatched(
-    query: npt.NDArray[np.float64], reference: npt.NDArray[np.float64], *, tolerance: float
+    query: npt.NDArray[np.float64],
+    reference: npt.NDArray[np.float64],
+    *,
+    tolerance: float,
 ) -> int:
     """How many query points have no reference point within ``tolerance``."""
     if not len(query):
         return 0
     tree = _tree(reference)
     if tree is not None:
-        return int((tree.query(np.asarray(query, dtype=np.float64))[0] > tolerance).sum())
-    return sum(1 for point in query if np.linalg.norm(reference - point, axis=1).min() > tolerance)
+        return int(
+            (tree.query(np.asarray(query, dtype=np.float64))[0] > tolerance).sum()
+        )
+    return sum(
+        1
+        for point in query
+        if np.linalg.norm(reference - point, axis=1).min() > tolerance
+    )
 
 
 def verify_paths(collection: Collection) -> Sequence[str]:
@@ -750,7 +846,9 @@ def verify_paths(collection: Collection) -> Sequence[str]:
         collection.manifest.catalog_file("objects", "catalog/objects.parquet").path,
     ]
     for level in range(collection.grid.levels):
-        paths.extend(entry.path for entry in collection.manifest.level_files(level) or [])
+        paths.extend(
+            entry.path for entry in collection.manifest.level_files(level) or []
+        )
     return paths
 
 

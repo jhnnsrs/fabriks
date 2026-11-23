@@ -135,7 +135,9 @@ def load_scene(source: Source, file_type: str, **kwargs: Any) -> trimesh.Scene: 
     """
     try:
         if isinstance(source, (bytes, bytearray)):
-            loaded = trimesh.load(io.BytesIO(bytes(source)), file_type=file_type, **kwargs)
+            loaded = trimesh.load(
+                io.BytesIO(bytes(source)), file_type=file_type, **kwargs
+            )
         elif isinstance(source, (str, os.PathLike)):
             loaded = trimesh.load(os.fspath(source), file_type=file_type, **kwargs)
         else:
@@ -149,7 +151,9 @@ def load_scene(source: Source, file_type: str, **kwargs: Any) -> trimesh.Scene: 
             if file_type == "gltf" and not isinstance(source, (str, os.PathLike))
             else ""
         )
-        raise FormatError(f"Could not read this as {file_type.upper()}: {error}.{hint}") from error
+        raise FormatError(
+            f"Could not read this as {file_type.upper()}: {error}.{hint}"
+        ) from error
 
     return as_scene(loaded)
 
@@ -170,7 +174,9 @@ def as_scene(loaded: Any) -> trimesh.Scene:  # noqa: ANN401 - whatever a loader 
             f"fabriks partitions surfaces, so a point cloud or a curve has nothing to write."
         )
     scene = trimesh.Scene()
-    scene.add_geometry(loaded, geom_name=str(getattr(loaded, "metadata", {}).get("name", "mesh")))
+    scene.add_geometry(
+        loaded, geom_name=str(getattr(loaded, "metadata", {}).get("name", "mesh"))
+    )
     return scene
 
 
@@ -232,7 +238,9 @@ def scene_to_objects(
     """Bake a scene's node transforms, fit it into voxels, and key it by object id."""
     baked = baked_geometries(scene)
     if not baked:
-        raise FormatError("This file holds no triangulated geometry, so there is nothing to write.")
+        raise FormatError(
+            "This file holds no triangulated geometry, so there is nothing to write."
+        )
 
     ids = assign_ids(list(baked))
     objects: dict[int, Mesh] = {}
@@ -266,8 +274,12 @@ def import_scene(
     """Fit, build, name and write a scene as a collection. Every ``read_*`` ends here."""
     axes = options.get("axes")
     if axes is None:
-        raise TypeError("Importing a scene needs `axes=`: the names of the three vertex slots, in slot order (a glTF's are its x, y, z). A collection without them could only be drawn by guessing.")
-    fit = fit_for(scene, options.get("fit"), options.get("resolution", DEFAULT_RESOLUTION))
+        raise TypeError(
+            "Importing a scene needs `axes=`: the names of the three vertex slots, in slot order (a glTF's are its x, y, z). A collection without them could only be drawn by guessing."
+        )
+    fit = fit_for(
+        scene, options.get("fit"), options.get("resolution", DEFAULT_RESOLUTION)
+    )
     objects, names = scene_to_objects(scene, fit=fit)
 
     cell_size = options.get("cell_size")
@@ -319,13 +331,17 @@ def read_source(
     **options: Unpack[ReadOptions],
 ) -> Imported:
     """Load a file and import it, which is the whole of what every ``read_*`` does."""
-    return import_scene(load_scene(source, file_type, **(loader or {})), store, prefix, **options)
+    return import_scene(
+        load_scene(source, file_type, **(loader or {})), store, prefix, **options
+    )
 
 
 # -- writing ----------------------------------------------------------------------- #
 
 
-def collection_to_scene(collection: Collection, **options: Unpack[WriteOptions]) -> trimesh.Scene:
+def collection_to_scene(
+    collection: Collection, **options: Unpack[WriteOptions]
+) -> trimesh.Scene:
     """Reassemble a collection at one level as a named scene in source coordinates.
 
     Each object is rebuilt whole through ``Collection.object_mesh`` rather than gathered cell by
@@ -342,7 +358,11 @@ def collection_to_scene(collection: Collection, **options: Unpack[WriteOptions])
     names = catalog.names_of(collection)
 
     wanted = options.get("objects")
-    ids = [int(item) for item in wanted] if wanted is not None else sorted(collection.objects)
+    ids = (
+        [int(item) for item in wanted]
+        if wanted is not None
+        else sorted(collection.objects)
+    )
 
     scene = trimesh.Scene()
     missing: list[int] = []
@@ -395,7 +415,9 @@ def export_scene(
     surprise inside trimesh.
     """
     exported = (
-        _merged(scene).export(file_type=file_type) if merge else scene.export(file_type=file_type)
+        _merged(scene).export(file_type=file_type)
+        if merge
+        else scene.export(file_type=file_type)
     )
     if isinstance(exported, dict):
         files = {str(name): _as_bytes(body) for name, body in exported.items()}
@@ -422,7 +444,9 @@ def _as_bytes(body: Any) -> bytes:  # noqa: ANN401 - an exporter returns str or 
     return str(body).encode()
 
 
-def _write_files(files: Mapping[str, bytes], target: str | os.PathLike[str], file_type: str) -> None:
+def _write_files(
+    files: Mapping[str, bytes], target: str | os.PathLike[str], file_type: str
+) -> None:
     """Write an export to disk: the model at ``target``, and any sibling buffers beside it."""
     from pathlib import Path
 

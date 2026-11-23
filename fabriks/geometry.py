@@ -113,7 +113,9 @@ def decimate_fixed(
     moved -- which is this kernel's estimate of its own error.
     """
     if placement not in ("midpoint", "onto_fixed"):
-        raise ValueError(f"`placement` is 'midpoint' or 'onto_fixed', got {placement!r}.")
+        raise ValueError(
+            f"`placement` is 'midpoint' or 'onto_fixed', got {placement!r}."
+        )
     vertices = np.asarray(vertices, dtype=np.float64).copy()
     faces = np.asarray(faces, dtype=np.int64)
     fixed = np.asarray(fixed, dtype=bool)
@@ -133,7 +135,11 @@ def decimate_fixed(
 
     def live_face_count() -> int:
         mapped = _roots(parent)[faces]
-        keep = (mapped[:, 0] != mapped[:, 1]) & (mapped[:, 1] != mapped[:, 2]) & (mapped[:, 0] != mapped[:, 2])
+        keep = (
+            (mapped[:, 0] != mapped[:, 1])
+            & (mapped[:, 1] != mapped[:, 2])
+            & (mapped[:, 0] != mapped[:, 2])
+        )
         return int(keep.sum())
 
     # How often to stop and count what is left. Counting is O(V + F), so on a large mesh it is
@@ -176,7 +182,11 @@ def decimate_fixed(
 
     roots = _roots(parent)
     mapped = roots[faces]
-    keep = (mapped[:, 0] != mapped[:, 1]) & (mapped[:, 1] != mapped[:, 2]) & (mapped[:, 0] != mapped[:, 2])
+    keep = (
+        (mapped[:, 0] != mapped[:, 1])
+        & (mapped[:, 1] != mapped[:, 2])
+        & (mapped[:, 0] != mapped[:, 2])
+    )
     mapped = mapped[keep]
 
     used = np.unique(mapped)
@@ -247,7 +257,9 @@ def snap_boundary(
 
 
 def on_planes(
-    vertices: npt.NDArray[np.float64], extent: npt.NDArray[np.float64], tolerance: float = 1e-6
+    vertices: npt.NDArray[np.float64],
+    extent: npt.NDArray[np.float64],
+    tolerance: float = 1e-6,
 ) -> npt.NDArray[np.bool_]:
     """Which vertices lie on a cell face plane of a grid with this cell extent.
 
@@ -257,7 +269,9 @@ def on_planes(
     quantum into half a voxel and collects vertices that merely pass near a plane.
     """
     scaled = vertices / extent
-    return np.asarray((np.abs(scaled - np.rint(scaled)) < tolerance).any(axis=1), dtype=bool)
+    return np.asarray(
+        (np.abs(scaled - np.rint(scaled)) < tolerance).any(axis=1), dtype=bool
+    )
 
 
 def border_vertices(faces: npt.NDArray[np.int64]) -> npt.NDArray[np.int64]:
@@ -276,7 +290,9 @@ def border_vertices(faces: npt.NDArray[np.int64]) -> npt.NDArray[np.int64]:
     faces = np.asarray(faces, dtype=np.int64)
     if not len(faces):
         return np.empty(0, dtype=np.int64)
-    edges = np.sort(np.vstack([faces[:, [0, 1]], faces[:, [1, 2]], faces[:, [2, 0]]]), axis=1)
+    edges = np.sort(
+        np.vstack([faces[:, [0, 1]], faces[:, [1, 2]], faces[:, [2, 0]]]), axis=1
+    )
     unique, counts = np.unique(edges, axis=0, return_counts=True)
     border = unique[counts == 1]
     return np.unique(border) if len(border) else np.empty(0, dtype=np.int64)
@@ -287,7 +303,9 @@ def border_vertices(faces: npt.NDArray[np.int64]) -> npt.NDArray[np.int64]:
 # --------------------------------------------------------------------------- #
 
 
-def clip_to_cells(mesh: Mesh, cell_size: npt.NDArray[np.int64]) -> dict[tuple[int, int, int], Any]:
+def clip_to_cells(
+    mesh: Mesh, cell_size: npt.NDArray[np.int64]
+) -> dict[tuple[int, int, int], Any]:
     """Cut a mesh at the level-0 cell planes, returning one fragment per occupied cell.
 
     Vertices produced by a cut lie exactly on the plane, which is what makes the boundary
@@ -313,7 +331,9 @@ def clip_to_cells(mesh: Mesh, cell_size: npt.NDArray[np.int64]) -> dict[tuple[in
     upper = np.floor((np.asarray(high) - 1e-9) / cell_size).astype(np.int64)
 
     fragments: dict[tuple[int, int, int], Any] = {}
-    pending: list[tuple[Any, npt.NDArray[np.int64], npt.NDArray[np.int64]]] = [(subject, lower, upper)]
+    pending: list[tuple[Any, npt.NDArray[np.int64], npt.NDArray[np.int64]]] = [
+        (subject, lower, upper)
+    ]
     while pending:
         piece, first, last = pending.pop()
         span = last - first
@@ -341,8 +361,12 @@ def clip_to_cells(mesh: Mesh, cell_size: npt.NDArray[np.int64]) -> dict[tuple[in
             # Narrow to the cells whose *closed* box the half still touches. Closed, so a face
             # lying exactly in a cell plane reaches every cell the per-cell cut gave it to.
             half_low, half_high = half.bounds[0], half.bounds[1]
-            half_first = np.maximum(half_first, np.ceil(half_low / size).astype(np.int64) - 1)
-            half_last = np.minimum(half_last, np.floor(half_high / size).astype(np.int64))
+            half_first = np.maximum(
+                half_first, np.ceil(half_low / size).astype(np.int64) - 1
+            )
+            half_last = np.minimum(
+                half_last, np.floor(half_high / size).astype(np.int64)
+            )
             if (half_first <= half_last).all():
                 pending.append((half, half_first, half_last))
 
@@ -352,7 +376,8 @@ def clip_to_cells(mesh: Mesh, cell_size: npt.NDArray[np.int64]) -> dict[tuple[in
 
 
 def concatenate_and_weld(
-    pieces: Sequence[tuple[npt.NDArray[np.float64], npt.NDArray[np.int64]]], tolerance: int = 9
+    pieces: Sequence[tuple[npt.NDArray[np.float64], npt.NDArray[np.int64]]],
+    tolerance: int = 9,
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.int64]]:
     """Merge fragments into one mesh, fusing vertices that coincide exactly.
 
@@ -378,7 +403,11 @@ def concatenate_and_weld(
     rank = np.empty_like(order)
     rank[order] = np.arange(len(order))
     faces = rank[inverse.reshape(-1)][faces]
-    keep = (faces[:, 0] != faces[:, 1]) & (faces[:, 1] != faces[:, 2]) & (faces[:, 0] != faces[:, 2])
+    keep = (
+        (faces[:, 0] != faces[:, 1])
+        & (faces[:, 1] != faces[:, 2])
+        & (faces[:, 0] != faces[:, 2])
+    )
     return vertices[first[order]], faces[keep]
 
 
@@ -391,7 +420,11 @@ def drop_degenerate(
     corner is no longer a face, and a zero-area one contributes nothing but a degenerate
     normal.
     """
-    keep = (faces[:, 0] != faces[:, 1]) & (faces[:, 1] != faces[:, 2]) & (faces[:, 0] != faces[:, 2])
+    keep = (
+        (faces[:, 0] != faces[:, 1])
+        & (faces[:, 1] != faces[:, 2])
+        & (faces[:, 0] != faces[:, 2])
+    )
     areas = np.linalg.norm(
         np.cross(
             vertices[faces[:, 1]] - vertices[faces[:, 0]],

@@ -37,10 +37,12 @@ def backend(name: str) -> fabriks.Simplifier:
 
 def a_sphere(subdivisions: int = 3) -> tuple[np.ndarray, np.ndarray]:
     """A closed surface with no boundary at all."""
-    mesh = trimesh.creation.icosphere(radius=20.0, subdivisions=subdivisions).apply_translation(
-        [50.0, 50.0, 50.0]
+    mesh = trimesh.creation.icosphere(
+        radius=20.0, subdivisions=subdivisions
+    ).apply_translation([50.0, 50.0, 50.0])
+    return np.asarray(mesh.vertices, dtype=np.float64), np.asarray(
+        mesh.faces, dtype=np.int64
     )
-    return np.asarray(mesh.vertices, dtype=np.float64), np.asarray(mesh.faces, dtype=np.int64)
 
 
 def a_cut_sheet() -> tuple[np.ndarray, np.ndarray]:
@@ -51,7 +53,9 @@ def a_cut_sheet() -> tuple[np.ndarray, np.ndarray]:
     cut = trimesh.intersections.slice_mesh_plane(
         mesh, plane_normal=[0.0, 0.0, 1.0], plane_origin=[0.0, 0.0, 50.0], cap=False
     )
-    return np.asarray(cut.vertices, dtype=np.float64), np.asarray(cut.faces, dtype=np.int64)
+    return np.asarray(cut.vertices, dtype=np.float64), np.asarray(
+        cut.faces, dtype=np.int64
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -64,7 +68,10 @@ def test_a_backend_reduces_toward_the_target(name: str):
     """The one thing a face budget asks for."""
     vertices, faces = a_sphere()
     result = backend(name).simplify(
-        vertices, faces, fixed=np.zeros(len(vertices), dtype=bool), target_faces=len(faces) // 4
+        vertices,
+        faces,
+        fixed=np.zeros(len(vertices), dtype=bool),
+        target_faces=len(faces) // 4,
     )
 
     assert len(result.faces) < len(faces)
@@ -77,7 +84,10 @@ def test_a_backend_leaves_a_mesh_already_under_target_alone(name: str):
     """No work to do, and no error to report for not doing it."""
     vertices, faces = a_sphere(subdivisions=1)
     result = backend(name).simplify(
-        vertices, faces, fixed=np.zeros(len(vertices), dtype=bool), target_faces=len(faces) * 2
+        vertices,
+        faces,
+        fixed=np.zeros(len(vertices), dtype=bool),
+        target_faces=len(faces) * 2,
     )
 
     assert len(result.faces) == len(faces)
@@ -90,7 +100,10 @@ def test_a_backend_produces_faces_that_index_its_own_vertices(name: str):
     """A remap mistake here is geometry that decodes to nonsense rather than an exception."""
     vertices, faces = a_sphere()
     result = backend(name).simplify(
-        vertices, faces, fixed=np.zeros(len(vertices), dtype=bool), target_faces=len(faces) // 8
+        vertices,
+        faces,
+        fixed=np.zeros(len(vertices), dtype=bool),
+        target_faces=len(faces) // 8,
     )
 
     assert result.faces.min() >= 0
@@ -118,7 +131,9 @@ def test_a_backend_keeps_the_boundary_where_it_was(name: str):
     fixed = np.zeros(len(vertices), dtype=bool)
     fixed[boundary] = True
 
-    result = backend(name).simplify(vertices, faces, fixed=fixed, target_faces=len(faces) // 4)
+    result = backend(name).simplify(
+        vertices, faces, fixed=fixed, target_faces=len(faces) // 4
+    )
 
     for position in vertices[boundary]:
         assert np.isclose(result.vertices, position).all(axis=1).any(), (
@@ -143,7 +158,10 @@ def test_the_quadric_backend_pins_the_boundary_and_frees_the_interior():
     boundary = border_vertices(faces)
 
     result = fabriks.QuadricSimplifier().simplify(
-        vertices, faces, fixed=np.zeros(len(vertices), dtype=bool), target_faces=len(faces) // 4
+        vertices,
+        faces,
+        fixed=np.zeros(len(vertices), dtype=bool),
+        target_faces=len(faces) // 4,
     )
 
     for position in vertices[boundary]:
@@ -153,9 +171,12 @@ def test_the_quadric_backend_pins_the_boundary_and_frees_the_interior():
 
     interior = np.setdiff1d(np.arange(len(vertices)), boundary)
     unmoved = sum(
-        bool((result.vertices == position).all(axis=1).any()) for position in vertices[interior]
+        bool((result.vertices == position).all(axis=1).any())
+        for position in vertices[interior]
     )
-    assert unmoved < len(interior), "no interior vertex moved, so this is not a quadric collapse"
+    assert unmoved < len(interior), (
+        "no interior vertex moved, so this is not a quadric collapse"
+    )
 
 
 def test_the_quadric_backend_reports_a_tighter_error_than_the_fallback():
@@ -194,7 +215,9 @@ def test_the_deviation_measure_is_an_upper_bound_and_grows_with_reduction():
         for ratio in (2, 4, 8, 16)
     ]
 
-    assert errors == sorted(errors), f"taking more geometry away reported less error: {errors}"
+    assert errors == sorted(errors), (
+        f"taking more geometry away reported less error: {errors}"
+    )
     assert all(error > 0.0 for error in errors)
 
 
@@ -217,8 +240,12 @@ def test_the_meshopt_backend_keeps_every_survivor_where_it_was_and_reaches_past_
     for position in result.vertices:
         assert (vertices == position).all(axis=1).any(), "a survivor was moved"
     for position in vertices[fixed]:
-        assert (result.vertices == position).all(axis=1).any(), "a locked vertex was collapsed"
-    assert result.backend == fabriks.SIMPLIFICATION_MESHOPT, "the fallback should not have run"
+        assert (result.vertices == position).all(axis=1).any(), (
+            "a locked vertex was collapsed"
+        )
+    assert result.backend == fabriks.SIMPLIFICATION_MESHOPT, (
+        "the fallback should not have run"
+    )
 
 
 def test_measuring_deviation_against_an_unchanged_mesh_is_zero():
@@ -245,12 +272,17 @@ def test_the_quadric_backend_falls_back_when_the_boundary_did_not_hold():
     quadric_module.boundary_held = lambda *args, **kwargs: False
     try:
         result = monkey.simplify(
-            vertices, faces, fixed=np.zeros(len(vertices), dtype=bool), target_faces=len(faces) // 4
+            vertices,
+            faces,
+            fixed=np.zeros(len(vertices), dtype=bool),
+            target_faces=len(faces) // 4,
         )
     finally:
         quadric_module.boundary_held = original
 
-    assert result.backend == fabriks.GreedyEdgeCollapse().name, "the fallback did not take over"
+    assert result.backend == fabriks.GreedyEdgeCollapse().name, (
+        "the fallback did not take over"
+    )
 
 
 def test_the_boundary_check_notices_a_boundary_that_did_not_hold():
@@ -275,7 +307,9 @@ def test_the_boundary_check_notices_a_boundary_that_did_not_hold():
     # And a wholesale shift of the boundary, which is the crack this exists to catch.
     shifted = vertices.copy()
     shifted[boundary] += 1e-6
-    assert not boundary_held(vertices, faces, shifted), "a micrometre off is still a gap"
+    assert not boundary_held(vertices, faces, shifted), (
+        "a micrometre off is still a gap"
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -285,9 +319,15 @@ def test_the_boundary_check_notices_a_boundary_that_did_not_hold():
 
 def test_a_name_selects_a_backend_and_the_default_is_the_meshopt_one():
     """`simplification` is a value out of a vocabulary, the way `codec` is."""
-    assert isinstance(simplifier_for(fabriks.SIMPLIFICATION_MESHOPT), fabriks.MeshoptSimplifier)
-    assert isinstance(simplifier_for(fabriks.SIMPLIFICATION_QUADRIC), fabriks.QuadricSimplifier)
-    assert isinstance(simplifier_for(fabriks.SIMPLIFICATION_GREEDY), fabriks.GreedyEdgeCollapse)
+    assert isinstance(
+        simplifier_for(fabriks.SIMPLIFICATION_MESHOPT), fabriks.MeshoptSimplifier
+    )
+    assert isinstance(
+        simplifier_for(fabriks.SIMPLIFICATION_QUADRIC), fabriks.QuadricSimplifier
+    )
+    assert isinstance(
+        simplifier_for(fabriks.SIMPLIFICATION_GREEDY), fabriks.GreedyEdgeCollapse
+    )
     assert isinstance(resolve_simplifier(None), fabriks.MeshoptSimplifier), (
         "the default is the meshopt collapse"
     )
@@ -308,18 +348,26 @@ def test_a_backend_this_package_does_not_ship_is_refused_by_name():
 
     chosen = fabriks.GreedyEdgeCollapse()
     assert resolve_simplifier(chosen) is chosen
-    assert isinstance(resolve_simplifier(fabriks.SIMPLIFICATION_GREEDY), fabriks.GreedyEdgeCollapse)
+    assert isinstance(
+        resolve_simplifier(fabriks.SIMPLIFICATION_GREEDY), fabriks.GreedyEdgeCollapse
+    )
 
 
 @pytest.mark.parametrize("name", BACKENDS)
-def test_a_target_that_destroys_the_surface_is_relaxed_until_something_survives(name: str):
+def test_a_target_that_destroys_the_surface_is_relaxed_until_something_survives(
+    name: str,
+):
     """A level is a standalone representation, so a piece may never be simplified to nothing."""
     box = trimesh.creation.box(extents=[10.0, 10.0, 10.0])
     vertices = np.asarray(box.vertices, dtype=np.float64)
     faces = np.asarray(box.faces, dtype=np.int64)
 
     result, relaxed = simplify_to_target(
-        backend(name), vertices, faces, fixed=np.zeros(len(vertices), dtype=bool), target_faces=1
+        backend(name),
+        vertices,
+        faces,
+        fixed=np.zeros(len(vertices), dtype=bool),
+        target_faces=1,
     )
 
     assert len(result.faces) > 0, "the object was simplified out of existence"
@@ -332,12 +380,18 @@ def test_a_target_that_destroys_the_surface_is_relaxed_until_something_survives(
 
 
 @pytest.mark.parametrize("name", BACKENDS)
-def test_a_collection_built_with_either_backend_holds_the_same_invariants(name: str, objects: dict):
+def test_a_collection_built_with_either_backend_holds_the_same_invariants(
+    name: str, objects: dict
+):
     """Both backends have to satisfy everything the format promises, not just the default one."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         collection = fabriks.build_collection(
-            objects, cell_size=(128, 128, 64), levels=3, simplifier=backend(name), axes=("x", "y", "z")
+            objects,
+            cell_size=(128, 128, 64),
+            levels=3,
+            simplifier=backend(name),
+            axes=("x", "y", "z"),
         )
 
     store = fabriks.MemoryStore()
@@ -375,7 +429,11 @@ def test_the_backend_choice_does_not_change_the_partition(objects: dict):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             built[name] = fabriks.build_collection(
-                objects, cell_size=(128, 128, 64), levels=3, simplifier=backend(name), axes=("x", "y", "z")
+                objects,
+                cell_size=(128, 128, 64),
+                levels=3,
+                simplifier=backend(name),
+                axes=("x", "y", "z"),
             )
 
     for level in range(3):
@@ -383,18 +441,25 @@ def test_the_backend_choice_does_not_change_the_partition(objects: dict):
             name: sorted(collection.shards[level][1].column("cell").to_pylist())
             for name, collection in built.items()
         }
-        assert cells[fabriks.SIMPLIFICATION_QUADRIC] == cells[fabriks.SIMPLIFICATION_GREEDY], (
-            f"level {level} was partitioned differently"
-        )
+        assert (
+            cells[fabriks.SIMPLIFICATION_QUADRIC]
+            == cells[fabriks.SIMPLIFICATION_GREEDY]
+        ), f"level {level} was partitioned differently"
 
 
 def test_the_manifest_declares_the_reduction_that_was_actually_applied(objects: dict):
     """`decimation` is a claim about the geometry that nothing downstream can re-derive."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        quarter = fabriks.build_collection(objects, cell_size=(128, 128, 64), levels=2, axes=("x", "y", "z"))
+        quarter = fabriks.build_collection(
+            objects, cell_size=(128, 128, 64), levels=2, axes=("x", "y", "z")
+        )
         half = fabriks.build_collection(
-            objects, cell_size=(128, 128, 64), levels=2, decimation=fabriks.Decimation.half(), axes=("x", "y", "z")
+            objects,
+            cell_size=(128, 128, 64),
+            levels=2,
+            decimation=fabriks.Decimation.half(),
+            axes=("x", "y", "z"),
         )
 
     assert quarter.manifest.encoding.decimation == fabriks.DECIMATION_QUARTER
@@ -402,7 +467,9 @@ def test_the_manifest_declares_the_reduction_that_was_actually_applied(objects: 
 
     half_faces = sum(half.shards[1][1].column("index_count").to_pylist())
     quarter_faces = sum(quarter.shards[1][1].column("index_count").to_pylist())
-    assert half_faces >= quarter_faces, "halving should keep at least as much as quartering"
+    assert half_faces >= quarter_faces, (
+        "halving should keep at least as much as quartering"
+    )
 
 
 def test_a_ratio_and_its_declaration_are_required_to_agree():
@@ -442,13 +509,20 @@ def test_without_meshoptimizer_the_default_is_quadric_and_meshopt_says_what_to_i
         fabriks.simplifiers.resolve_simplifier("MESHOPT")
 
 
-def test_a_collection_builds_without_meshoptimizer(objects: dict, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_a_collection_builds_without_meshoptimizer(
+    objects: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """The whole build -- clip, simplify, encode, write, read back -- with no compiled extra at all."""
     import sys
 
     monkeypatch.setitem(sys.modules, "meshoptimizer", None)
-    collection = fabriks.build_collection(objects, cell_size=(128, 128, 64), levels=2, axes=("x", "y", "z"))
+    collection = fabriks.build_collection(
+        objects, cell_size=(128, 128, 64), levels=2, axes=("x", "y", "z")
+    )
 
     store = fabriks.MemoryStore()
     fabriks.write_collection(collection, store, "c")
-    assert fabriks.open_collection(store, "c").object_mesh(next(iter(objects)), level=1) is not None
+    assert (
+        fabriks.open_collection(store, "c").object_mesh(next(iter(objects)), level=1)
+        is not None
+    )

@@ -41,7 +41,9 @@ def two_objects(scale=1.0, centre=True):
 def dense_objects():
     """The same two objects with enough triangles to fill a real octree."""
     scene = trimesh.Scene()
-    scene.add_geometry(trimesh.creation.icosphere(radius=0.6, subdivisions=3), geom_name="head")
+    scene.add_geometry(
+        trimesh.creation.icosphere(radius=0.6, subdivisions=3), geom_name="head"
+    )
     scene.add_geometry(
         trimesh.creation.box(extents=[1.0, 0.4, 0.3]),
         geom_name="7",
@@ -53,7 +55,12 @@ def dense_objects():
 def imported(scene, **options: object):
     """Read a scene through GLB into a memory store, and open what came out."""
     store = fabriks.MemoryStore()
-    result = read_glb(scene.export(file_type="glb"), store, "c", **{"axes": ("x", "y", "z"), **options})
+    result = read_glb(
+        scene.export(file_type="glb"),
+        store,
+        "c",
+        **{"axes": ("x", "y", "z"), **options},
+    )
     return result, fabriks.open_collection(store, "c")
 
 
@@ -83,7 +90,9 @@ def test_a_unit_scale_model_is_given_enough_voxels_to_partition():
     `resolution` voxels and a 128-voxel cell cuts it into many; unfitted, the same model is
     smaller than the smallest cell that can exist and the octree has nowhere to go.
     """
-    _, collection = imported(two_objects(scale=0.002), cell_size=(128, 128, 128), levels=3)
+    _, collection = imported(
+        two_objects(scale=0.002), cell_size=(128, 128, 128), levels=3
+    )
 
     entries = collection.objects.values()
     low = [min(entry.bbox_min[axis] for entry in entries) for axis in range(3)]
@@ -115,18 +124,28 @@ def test_the_fit_undoes_itself():
     fit = VoxelFit.for_bounds([-3.0, -1.0, 0.5], [1.0, 2.0, 4.5])
     points = np.array([[-3.0, -1.0, 0.5], [0.0, 0.0, 1.0], [1.0, 2.0, 4.5]])
 
-    assert np.allclose(fit.invert(fit.apply(points)), points), "the fit does not round trip"
-    assert np.all(fit.apply(points) >= -1e-9), "a fitted model should land in the positive octant"
+    assert np.allclose(fit.invert(fit.apply(points)), points), (
+        "the fit does not round trip"
+    )
+    assert np.all(fit.apply(points) >= -1e-9), (
+        "a fitted model should land in the positive octant"
+    )
 
 
 def test_the_longest_side_sets_the_scale_for_every_component():
     """A per-component fit would stretch a model to fill its box and distort every render of it."""
-    fit = VoxelFit.for_bounds([0.0, 0.0, 0.0], [4.0, 2.0, 1.0], resolution=DEFAULT_RESOLUTION)
+    fit = VoxelFit.for_bounds(
+        [0.0, 0.0, 0.0], [4.0, 2.0, 1.0], resolution=DEFAULT_RESOLUTION
+    )
 
     fitted = fit.apply(np.array([[4.0, 2.0, 1.0]]))[0]
 
-    assert fitted[0] == pytest.approx(DEFAULT_RESOLUTION), "the longest side sets the scale"
-    assert fitted[1] == pytest.approx(DEFAULT_RESOLUTION / 2), "proportions must be preserved"
+    assert fitted[0] == pytest.approx(DEFAULT_RESOLUTION), (
+        "the longest side sets the scale"
+    )
+    assert fitted[1] == pytest.approx(DEFAULT_RESOLUTION / 2), (
+        "proportions must be preserved"
+    )
 
 
 def test_a_model_with_no_extent_does_not_divide_by_zero():
@@ -138,7 +157,9 @@ def test_an_identity_fit_leaves_a_model_where_it_was():
     """A caller whose model is already in voxel coordinates must be able to say so."""
     scene = two_objects(scale=200.0, centre=False)
 
-    _, collection = imported(scene, fit=VoxelFit.identity(), cell_size=(64, 64, 64), levels=2)
+    _, collection = imported(
+        scene, fit=VoxelFit.identity(), cell_size=(64, 64, 64), levels=2
+    )
 
     high = max(max(entry.bbox_max) for entry in collection.cells.values())
     assert high == pytest.approx(scene.bounds[1].max(), rel=0.01), (
@@ -161,7 +182,9 @@ def test_a_model_sized_into_a_single_level_says_so():
     ("options", "expected_levels"),
     [({}, 1), ({"cell_size": (128, 128, 128)}, 1), ({"levels": 3}, 3)],
 )
-def test_the_grid_is_filled_in_only_where_the_caller_left_it_open(options, expected_levels):
+def test_the_grid_is_filled_in_only_where_the_caller_left_it_open(
+    options, expected_levels
+):
     """`cell_size` and `levels` are independent: giving one must not discard the other.
 
     Both come from `plan_grid` when neither is given, and either one alone has to survive while
@@ -203,7 +226,13 @@ def test_an_object_that_is_only_a_mesh_still_reads():
     store = fabriks.MemoryStore()
     mesh = trimesh.creation.icosphere(radius=1.0, subdivisions=2)
 
-    result = read_glb(trimesh.Scene(mesh).export(file_type="glb"), store, "c", levels=2, axes=("x", "y", "z"))
+    result = read_glb(
+        trimesh.Scene(mesh).export(file_type="glb"),
+        store,
+        "c",
+        levels=2,
+        axes=("x", "y", "z"),
+    )
 
     assert len(result.names) == 1, "one mesh is one object"
 
@@ -244,8 +273,12 @@ def test_the_names_ride_on_the_object_catalog():
     """The names have to survive the write, or an export can only number its objects."""
     result, collection = imported(two_objects())
 
-    assert "name" in collection.object_catalog.column_names, "the name column was not written"
-    assert names_of(collection) == result.names, "the names did not survive the round trip"
+    assert "name" in collection.object_catalog.column_names, (
+        "the name column was not written"
+    )
+    assert names_of(collection) == result.names, (
+        "the names did not survive the round trip"
+    )
     assert collection.objects[7].name == "7", "ObjectEntry should carry the name too"
 
 
@@ -255,16 +288,24 @@ def test_a_collection_written_without_the_column_still_reads(opened):
     Reading one has to give None rather than raise -- this is the back-compatibility gate on the
     whole approach of carrying contrib's facts as extra catalog columns.
     """
-    assert names_of(opened) == {}, "a collection with no names should report none, not guess"
-    assert fit_of(opened) is None, "no recorded fit is a different answer from an identity fit"
-    assert opened.objects[7].name is None, "an absent name column must read back as None"
+    assert names_of(opened) == {}, (
+        "a collection with no names should report none, not guess"
+    )
+    assert fit_of(opened) is None, (
+        "no recorded fit is a different answer from an identity fit"
+    )
+    assert opened.objects[7].name is None, (
+        "an absent name column must read back as None"
+    )
 
 
 def test_the_fit_travels_with_the_collection():
     """An export inverts the import's own numbers, so they have to be in the collection."""
     result, collection = imported(two_objects())
 
-    assert fit_of(collection) == result.fit, "the recorded fit is not the one that was applied"
+    assert fit_of(collection) == result.fit, (
+        "the recorded fit is not the one that was applied"
+    )
 
 
 # -- export selection --------------------------------------------------------------- #
@@ -276,7 +317,9 @@ def test_an_export_can_be_narrowed_to_the_objects_that_matter():
 
     scene = collection_to_scene(collection, objects=[7])
 
-    assert sorted(scene.geometry) == ["7"], f"asked for one object, got {sorted(scene.geometry)}"
+    assert sorted(scene.geometry) == ["7"], (
+        f"asked for one object, got {sorted(scene.geometry)}"
+    )
 
 
 def test_an_object_missing_from_a_coarse_level_is_reported_rather_than_dropped(opened):
@@ -288,7 +331,9 @@ def test_an_object_missing_from_a_coarse_level_is_reported_rather_than_dropped(o
     with pytest.warns(UserWarning, match="no geometry at level"):
         scene = collection_to_scene(opened, level=0, objects=[7, 999])
 
-    assert sorted(scene.geometry) == ["7"], "the objects that do exist should still be exported"
+    assert sorted(scene.geometry) == ["7"], (
+        "the objects that do exist should still be exported"
+    )
 
 
 def test_an_export_with_nothing_in_it_is_refused(opened):

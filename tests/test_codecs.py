@@ -14,7 +14,9 @@ from fabriks.codecs import QUANT_MAX
 from fabriks.octree import cell_box
 
 
-@pytest.mark.parametrize("compression", [fabriks.COMPRESSION_NONE, fabriks.COMPRESSION_ZSTD])
+@pytest.mark.parametrize(
+    "compression", [fabriks.COMPRESSION_NONE, fabriks.COMPRESSION_ZSTD]
+)
 def test_positions_round_trip_within_a_quantum(compression: str):
     """The quantization error is bounded by the cell's own quantum, however the blob is stored."""
     cell_size = (128, 128, 64)
@@ -37,7 +39,9 @@ def test_positions_round_trip_within_a_quantum(compression: str):
     )
 
     quantum = extent / QUANT_MAX
-    assert np.all(np.abs(decoded - vertices) <= quantum), "a vertex moved by more than one quantum"
+    assert np.all(np.abs(decoded - vertices) <= quantum), (
+        "a vertex moved by more than one quantum"
+    )
 
 
 def test_an_uncompressed_positions_blob_is_six_bytes_per_vertex():
@@ -47,11 +51,22 @@ def test_an_uncompressed_positions_blob_is_six_bytes_per_vertex():
     vertices = origin + np.array([[0.0, 0.0, 0.0], [128.0, 128.0, 64.0]])
 
     blob = fabriks.encode_positions(
-        vertices, cell=0, level=0, cell_size=cell_size, compression=fabriks.COMPRESSION_NONE
+        vertices,
+        cell=0,
+        level=0,
+        cell_size=cell_size,
+        compression=fabriks.COMPRESSION_NONE,
     )
 
     assert len(blob) == 6 * len(vertices)
-    assert np.frombuffer(blob, dtype="<u2").tolist() == [0, 0, 0, QUANT_MAX, QUANT_MAX, QUANT_MAX]
+    assert np.frombuffer(blob, dtype="<u2").tolist() == [
+        0,
+        0,
+        0,
+        QUANT_MAX,
+        QUANT_MAX,
+        QUANT_MAX,
+    ]
 
 
 def test_a_vertex_outside_its_cell_is_refused_rather_than_clamped():
@@ -79,10 +94,16 @@ def test_a_boundary_vertex_is_not_mistaken_for_a_stray_one():
         cell_size=(128, 128, 64),
         compression=fabriks.COMPRESSION_NONE,
     )
-    assert np.frombuffer(blob, dtype="<u2").tolist() == [QUANT_MAX, QUANT_MAX, QUANT_MAX]
+    assert np.frombuffer(blob, dtype="<u2").tolist() == [
+        QUANT_MAX,
+        QUANT_MAX,
+        QUANT_MAX,
+    ]
 
 
-@pytest.mark.parametrize("compression", [fabriks.COMPRESSION_NONE, fabriks.COMPRESSION_ZSTD])
+@pytest.mark.parametrize(
+    "compression", [fabriks.COMPRESSION_NONE, fabriks.COMPRESSION_ZSTD]
+)
 def test_indices_round_trip_as_the_same_triangles(compression: str):
     """MESHOPT preserves triangle order but may rotate a triangle's starting vertex.
 
@@ -92,17 +113,25 @@ def test_indices_round_trip_as_the_same_triangles(compression: str):
     faces = np.array([[0, 1, 2], [2, 1, 3], [3, 4, 0], [4, 5, 1]], dtype=np.int64)
 
     blob = fabriks.encode_indices(faces, compression=compression, vertex_count=6)
-    decoded = fabriks.decode_indices(blob, compression=compression, index_count=faces.size)
+    decoded = fabriks.decode_indices(
+        blob, compression=compression, index_count=faces.size
+    )
 
     assert decoded.shape == faces.shape
-    assert [set(triangle) for triangle in decoded] == [set(triangle) for triangle in faces]
+    assert [set(triangle) for triangle in decoded] == [
+        set(triangle) for triangle in faces
+    ]
 
 
 def test_decoding_meshopt_without_a_count_is_refused():
     """The encoded buffer carries no length, which is why the geometry row has the column."""
     with pytest.raises(ValueError, match="`vertex_count` is required"):
         fabriks.decode_positions(
-            b"", cell=0, level=0, cell_size=(128, 128, 64), compression=fabriks.COMPRESSION_ZSTD
+            b"",
+            cell=0,
+            level=0,
+            cell_size=(128, 128, 64),
+            compression=fabriks.COMPRESSION_ZSTD,
         )
     with pytest.raises(ValueError, match="`index_count` is required"):
         fabriks.decode_indices(b"", compression=fabriks.COMPRESSION_ZSTD)
@@ -117,12 +146,20 @@ def test_a_compressed_blob_needs_its_row_to_know_its_length():
     """
     vertices = np.array([[0.0, 0, 0], [64, 64, 32]])
     blob = fabriks.encode_positions(
-        vertices, cell=0, level=0, cell_size=(128, 128, 64), compression=fabriks.COMPRESSION_ZSTD
+        vertices,
+        cell=0,
+        level=0,
+        cell_size=(128, 128, 64),
+        compression=fabriks.COMPRESSION_ZSTD,
     )
 
     with pytest.raises(fabriks.FormatError, match="required to decode a compressed"):
         fabriks.decode_positions(
-            blob, cell=0, level=0, cell_size=(128, 128, 64), compression=fabriks.COMPRESSION_ZSTD
+            blob,
+            cell=0,
+            level=0,
+            cell_size=(128, 128, 64),
+            compression=fabriks.COMPRESSION_ZSTD,
         )
 
     decoded = fabriks.decode_positions(
@@ -144,5 +181,9 @@ def test_an_unknown_codec_or_compression_is_refused_by_name():
         )
     with pytest.raises(fabriks.FormatError, match="`compression` is"):
         fabriks.encode_positions(
-            np.zeros((1, 3)), cell=0, level=0, cell_size=(128, 128, 64), compression="BROTLI"
+            np.zeros((1, 3)),
+            cell=0,
+            level=0,
+            cell_size=(128, 128, 64),
+            compression="BROTLI",
         )

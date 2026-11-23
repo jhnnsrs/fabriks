@@ -19,7 +19,9 @@ def test_no_budget_descends_to_the_finest_level(opened: fabriks.Collection):
     assert len(plan) == len(opened.cells_at(0))
 
 
-def test_a_generous_error_budget_stops_at_the_coarsest_level(opened: fabriks.Collection):
+def test_a_generous_error_budget_stops_at_the_coarsest_level(
+    opened: fabriks.Collection,
+):
     """The other end: one cell, the whole collection, as coarse as it goes."""
     plan = opened.plan(error_budget=1e9)
 
@@ -32,13 +34,18 @@ def test_a_tighter_budget_never_returns_a_coarser_plan(opened: fabriks.Collectio
     """Monotonicity: spending less error can only add detail, never remove it."""
     budgets = [1e9, 10.0, 1.0, 0.1, 0.0]
     face_counts = [
-        sum(entry.face_count for entry in opened.plan(error_budget=budget)) for budget in budgets
+        sum(entry.face_count for entry in opened.plan(error_budget=budget))
+        for budget in budgets
     ]
 
-    assert face_counts == sorted(face_counts), f"tightening the budget lost detail: {face_counts}"
+    assert face_counts == sorted(face_counts), (
+        f"tightening the budget lost detail: {face_counts}"
+    )
 
 
-def test_the_plan_covers_the_collection_without_drawing_a_cell_twice(opened: fabriks.Collection):
+def test_the_plan_covers_the_collection_without_drawing_a_cell_twice(
+    opened: fabriks.Collection,
+):
     """A plan is a *cut* through the octree: every region once, at exactly one level."""
     for budget in (1e9, 5.0, 0.5, 0.0):
         plan = opened.plan(error_budget=budget)
@@ -81,15 +88,20 @@ def test_a_camera_spends_the_budget_in_pixels_and_so_depends_on_distance(
     near_plan = opened.plan(camera=near, pixel_budget=1.0)
     far_plan = opened.plan(camera=far, pixel_budget=1.0)
 
-    assert min(entry.level for entry in near_plan) <= min(entry.level for entry in far_plan)
+    assert min(entry.level for entry in near_plan) <= min(
+        entry.level for entry in far_plan
+    )
     assert sum(e.face_count for e in near_plan) >= sum(e.face_count for e in far_plan)
 
 
-def test_a_camera_inside_a_cell_takes_the_finest_level_available(opened: fabriks.Collection):
+def test_a_camera_inside_a_cell_takes_the_finest_level_available(
+    opened: fabriks.Collection,
+):
     """Distance to the box, not to its centre -- otherwise a camera inside descends forever."""
     entry = opened.cells_at(0)[0]
     inside = (
-        np.asarray(entry.bbox_min) + (np.asarray(entry.bbox_max) - np.asarray(entry.bbox_min)) / 2
+        np.asarray(entry.bbox_min)
+        + (np.asarray(entry.bbox_max) - np.asarray(entry.bbox_min)) / 2
     )
 
     camera = fabriks.Camera.perspective(inside, fov_y=0.8, viewport_height=1080)
@@ -130,7 +142,9 @@ def test_a_frustum_culls_what_is_behind_it(opened: fabriks.Collection):
     assert len(opened.plan(error_budget=1e9, frustum=ahead)) == len(everything)
 
 
-def test_an_object_filter_resolves_through_the_object_catalog(opened: fabriks.Collection):
+def test_an_object_filter_resolves_through_the_object_catalog(
+    opened: fabriks.Collection,
+):
     """ "Where is segment 4711" answered as a lookup, then used to narrow the plan."""
     object_id = next(iter(opened.objects))
     named = set(opened.objects[object_id].cells)
@@ -155,9 +169,12 @@ def test_running_out_of_cells_degrades_detail_rather_than_dropping_geometry(
     # Every region the full plan covers is still covered, just possibly by a coarser cell.
     for fine in full:
         assert any(
-            (coarse.level, coarse.cell) == (fine.level, fine.cell) or _is_ancestor(coarse, fine)
+            (coarse.level, coarse.cell) == (fine.level, fine.cell)
+            or _is_ancestor(coarse, fine)
             for coarse in capped
-        ), f"cell {fine.cell} at level {fine.level} is covered by nothing in the capped plan"
+        ), (
+            f"cell {fine.cell} at level {fine.level} is covered by nothing in the capped plan"
+        )
 
 
 def test_min_level_stops_the_descent_where_it_is_told(opened: fabriks.Collection):
@@ -201,7 +218,9 @@ def test_the_planner_reads_only_the_cell_catalog(written: fabriks.MemoryStore):
                 raise AssertionError(f"the planner opened geometry: {path}")
             return super().get(path)
 
-    collection = fabriks.open_collection(GeometryIsOffLimits(written.objects), "collection")
+    collection = fabriks.open_collection(
+        GeometryIsOffLimits(written.objects), "collection"
+    )
 
     assert collection.plan(error_budget=0.5)
     assert len(collection.plan()) == len(collection.cells_at(0))
@@ -210,7 +229,9 @@ def test_the_planner_reads_only_the_cell_catalog(written: fabriks.MemoryStore):
 def test_planning_over_every_level_of_the_fixture(opened: fabriks.Collection):
     """A budget between the levels' errors selects a genuinely mixed plan where one exists."""
     errors = sorted({round(entry.lod_error, 6) for entry in opened.cells.values()})
-    assert len(errors) >= 2, "the fixture should have distinguishable errors between levels"
+    assert len(errors) >= 2, (
+        "the fixture should have distinguishable errors between levels"
+    )
 
     mixed = opened.plan(error_budget=errors[len(errors) // 2])
 
