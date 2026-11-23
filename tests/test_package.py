@@ -30,7 +30,7 @@ _SUBMODULES = {
 }
 
 
-def test_everything_promised_is_actually_there():
+def test_everything_promised_is_actually_there() -> None:
     """A name in ``__all__`` that does not resolve is a documented symbol that is not real."""
     missing = [name for name in fabriks.__all__ if not hasattr(fabriks, name)]
 
@@ -39,7 +39,7 @@ def test_everything_promised_is_actually_there():
     )
 
 
-def test_nothing_public_is_left_out_of_the_promise():
+def test_nothing_public_is_left_out_of_the_promise() -> None:
     """A public name outside ``__all__`` is reachable, undocumented, and accidentally supported.
 
     ``from fabriks import *`` will not hand it over and the docs will not list it, yet it works
@@ -57,7 +57,7 @@ def test_nothing_public_is_left_out_of_the_promise():
     )
 
 
-def test_the_promise_lists_each_name_once():
+def test_the_promise_lists_each_name_once() -> None:
     """A duplicate is a merge that went unnoticed.
 
     Ordering is not checked here: ruff's ``RUF022`` already enforces it as a lint gate, and it

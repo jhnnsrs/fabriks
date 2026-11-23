@@ -8,7 +8,7 @@ import fabriks
 from fabriks.frames import arrow_schemas, parquet_to_table, table_to_parquet
 
 
-def test_every_role_declares_the_columns_the_format_requires():
+def test_every_role_declares_the_columns_the_format_requires() -> None:
     """The column layer is the contract: nothing downstream opens a blob."""
     schemas = arrow_schemas()
 
@@ -18,7 +18,7 @@ def test_every_role_declares_the_columns_the_format_requires():
         )
 
 
-def test_the_column_types_are_the_ones_a_describe_would_print():
+def test_the_column_types_are_the_ones_a_describe_would_print() -> None:
     """Name *and* type are compared by a server, so a Morton code stored as text is refused."""
     pa = pytest.importorskip("pyarrow")
     schemas = arrow_schemas()
@@ -42,7 +42,7 @@ def test_the_column_types_are_the_ones_a_describe_would_print():
 
 def test_the_built_frames_match_the_declared_schemas(
     collection: fabriks.MeshCollection,
-):
+) -> None:
     """What the builder produces is what the schemas promise."""
     schemas = arrow_schemas()
 
@@ -52,7 +52,7 @@ def test_the_built_frames_match_the_declared_schemas(
         assert shard.schema.equals(schemas["geometry"])
 
 
-def test_extra_columns_are_allowed(collection: fabriks.MeshCollection):
+def test_extra_columns_are_allowed(collection: fabriks.MeshCollection) -> None:
     """A writer may carry a denormalized attribute copy alongside; the check is presence-only."""
     pa = pytest.importorskip("pyarrow")
     widened = collection.cell_catalog.append_column(
@@ -62,7 +62,9 @@ def test_extra_columns_are_allowed(collection: fabriks.MeshCollection):
     fabriks.validate_columns(widened, "cell_catalog")  # must not raise
 
 
-def test_a_missing_column_is_named_in_the_error(collection: fabriks.MeshCollection):
+def test_a_missing_column_is_named_in_the_error(
+    collection: fabriks.MeshCollection,
+) -> None:
     """The message has to say which column and which role, or it costs a debugging round."""
     narrowed = collection.cell_catalog.drop_columns(["child_mask"])
 
@@ -73,13 +75,13 @@ def test_a_missing_column_is_named_in_the_error(collection: fabriks.MeshCollecti
     assert "cell catalog" in str(failure.value)
 
 
-def test_an_unknown_role_is_refused():
+def test_an_unknown_role_is_refused() -> None:
     """Three roles, and a typo in one is caught rather than silently checking nothing."""
     with pytest.raises(fabriks.FormatError, match="not a role"):
         fabriks.validate_columns(None, "geometries")
 
 
-def test_parquet_round_trips_the_frames(collection: fabriks.MeshCollection):
+def test_parquet_round_trips_the_frames(collection: fabriks.MeshCollection) -> None:
     """Including the binary blob columns, which are the ones with anything to lose."""
     restored = parquet_to_table(table_to_parquet(collection.shards[0][1]))
 
@@ -87,7 +89,7 @@ def test_parquet_round_trips_the_frames(collection: fabriks.MeshCollection):
     assert restored.to_pylist() == collection.shards[0][1].to_pylist()
 
 
-def test_an_empty_level_still_produces_a_valid_frame():
+def test_an_empty_level_still_produces_a_valid_frame() -> None:
     """A genuinely empty level is written out rather than skipped: a gap is never asked for."""
     schemas = arrow_schemas()
     from fabriks.frames import build_table

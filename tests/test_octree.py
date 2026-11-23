@@ -13,7 +13,7 @@ import fabriks
 from fabriks.octree import MORTON_BITS, cell_box
 
 
-def test_morton_interleaves_with_x_least_significant():
+def test_morton_interleaves_with_x_least_significant() -> None:
     """The bit order is the format, not an implementation detail.
 
     Spelled out rather than round-tripped: a writer and a reader that agree on the *wrong*
@@ -27,25 +27,25 @@ def test_morton_interleaves_with_x_least_significant():
     assert fabriks.morton_encode_one((0, 0, 2)) == 0b100000
 
 
-def test_morton_round_trips_over_asymmetric_triples():
+def test_morton_round_trips_over_asymmetric_triples() -> None:
     """Asymmetric on purpose: (3, 5, 9) survives a swapped decoder, (3, 3, 3) does not."""
     for triple in [(0, 0, 0), (3, 5, 9), (17, 2, 300), (1, 0, 65536)]:
         assert fabriks.morton_decode(fabriks.morton_encode_one(triple)) == triple
 
 
-def test_a_cell_index_past_seventeen_bits_is_refused():
+def test_a_cell_index_past_seventeen_bits_is_refused() -> None:
     """The cap is what keeps a Morton code under the format's 2**53 limit."""
     with pytest.raises(ValueError, match="17-bit limit"):
         fabriks.morton_encode_one((1 << MORTON_BITS, 0, 0))
 
 
-def test_a_negative_cell_index_is_refused():
+def test_a_negative_cell_index_is_refused() -> None:
     """Geometry is shifted into the positive octant before it is addressed."""
     with pytest.raises(ValueError, match="non-negative"):
         fabriks.morton_encode(np.array([[-1, 0, 0]]))
 
 
-def test_the_cell_box_is_the_morton_triple_scaled_by_the_level():
+def test_the_cell_box_is_the_morton_triple_scaled_by_the_level() -> None:
     """A decoder needs only `level` and `cell` to find the box, which is what per-cell means."""
     origin, extent = cell_box(fabriks.morton_encode_one((2, 1, 3)), 1, (128, 128, 64))
     assert extent.tolist() == [256.0, 256.0, 128.0]

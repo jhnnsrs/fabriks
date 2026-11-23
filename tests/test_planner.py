@@ -11,7 +11,7 @@ import fabriks
 from tests.conftest import LEVELS
 
 
-def test_no_budget_descends_to_the_finest_level(opened: fabriks.Collection):
+def test_no_budget_descends_to_the_finest_level(opened: fabriks.Collection) -> None:
     """With nothing said about acceptable error, the answer is everything at full detail."""
     plan = opened.plan()
 
@@ -21,7 +21,7 @@ def test_no_budget_descends_to_the_finest_level(opened: fabriks.Collection):
 
 def test_a_generous_error_budget_stops_at_the_coarsest_level(
     opened: fabriks.Collection,
-):
+) -> None:
     """The other end: one cell, the whole collection, as coarse as it goes."""
     plan = opened.plan(error_budget=1e9)
 
@@ -30,7 +30,9 @@ def test_a_generous_error_budget_stops_at_the_coarsest_level(
     ]
 
 
-def test_a_tighter_budget_never_returns_a_coarser_plan(opened: fabriks.Collection):
+def test_a_tighter_budget_never_returns_a_coarser_plan(
+    opened: fabriks.Collection,
+) -> None:
     """Monotonicity: spending less error can only add detail, never remove it."""
     budgets = [1e9, 10.0, 1.0, 0.1, 0.0]
     face_counts = [
@@ -45,7 +47,7 @@ def test_a_tighter_budget_never_returns_a_coarser_plan(opened: fabriks.Collectio
 
 def test_the_plan_covers_the_collection_without_drawing_a_cell_twice(
     opened: fabriks.Collection,
-):
+) -> None:
     """A plan is a *cut* through the octree: every region once, at exactly one level."""
     for budget in (1e9, 5.0, 0.5, 0.0):
         plan = opened.plan(error_budget=budget)
@@ -74,7 +76,7 @@ def _is_ancestor(coarse: fabriks.CellEntry, fine: fabriks.CellEntry) -> bool:
 
 def test_a_camera_spends_the_budget_in_pixels_and_so_depends_on_distance(
     opened: fabriks.Collection,
-):
+) -> None:
     """The reason for an octree: a far cell settles coarse, a near one descends."""
     centre = np.mean([entry.bbox_min for entry in opened.cells.values()], axis=0)
 
@@ -96,7 +98,7 @@ def test_a_camera_spends_the_budget_in_pixels_and_so_depends_on_distance(
 
 def test_a_camera_inside_a_cell_takes_the_finest_level_available(
     opened: fabriks.Collection,
-):
+) -> None:
     """Distance to the box, not to its centre -- otherwise a camera inside descends forever."""
     entry = opened.cells_at(0)[0]
     inside = (
@@ -112,7 +114,7 @@ def test_a_camera_inside_a_cell_takes_the_finest_level_available(
     ]
 
 
-def test_a_box_query_keeps_only_what_it_meets(opened: fabriks.Collection):
+def test_a_box_query_keeps_only_what_it_meets(opened: fabriks.Collection) -> None:
     """The cheap spatial filter, answered entirely from the catalog."""
     target = opened.cells_at(0)[0]
     plan = opened.plan(box=(target.bbox_min, target.bbox_max))
@@ -123,12 +125,12 @@ def test_a_box_query_keeps_only_what_it_meets(opened: fabriks.Collection):
         assert (np.asarray(entry.bbox_min) <= np.asarray(target.bbox_max)).all()
 
 
-def test_a_box_that_meets_nothing_returns_nothing(opened: fabriks.Collection):
+def test_a_box_that_meets_nothing_returns_nothing(opened: fabriks.Collection) -> None:
     """An empty plan is a legitimate answer, not an error."""
     assert opened.plan(box=((1e6, 1e6, 1e6), (2e6, 2e6, 2e6))) == []
 
 
-def test_a_frustum_culls_what_is_behind_it(opened: fabriks.Collection):
+def test_a_frustum_culls_what_is_behind_it(opened: fabriks.Collection) -> None:
     """Conservative: it may keep a cell that is not visible, never cull one that is."""
     everything = opened.plan(error_budget=1e9)
     origin = np.asarray(everything[0].bbox_min)
@@ -144,7 +146,7 @@ def test_a_frustum_culls_what_is_behind_it(opened: fabriks.Collection):
 
 def test_an_object_filter_resolves_through_the_object_catalog(
     opened: fabriks.Collection,
-):
+) -> None:
     """ "Where is segment 4711" answered as a lookup, then used to narrow the plan."""
     object_id = next(iter(opened.objects))
     named = set(opened.objects[object_id].cells)
@@ -158,7 +160,7 @@ def test_an_object_filter_resolves_through_the_object_catalog(
 
 def test_running_out_of_cells_degrades_detail_rather_than_dropping_geometry(
     opened: fabriks.Collection,
-):
+) -> None:
     """The failure mode matters: a missing cell is a hole in the surface, a coarse cell is not."""
     full = opened.plan(error_budget=0.0)
     capped = opened.plan(error_budget=0.0, max_cells=2)
@@ -177,7 +179,9 @@ def test_running_out_of_cells_degrades_detail_rather_than_dropping_geometry(
         )
 
 
-def test_min_level_stops_the_descent_where_it_is_told(opened: fabriks.Collection):
+def test_min_level_stops_the_descent_where_it_is_told(
+    opened: fabriks.Collection,
+) -> None:
     """A viewer that cannot afford the finest level asks not to be given it."""
     plan = opened.plan(error_budget=0.0, min_level=1)
 
@@ -185,7 +189,7 @@ def test_min_level_stops_the_descent_where_it_is_told(opened: fabriks.Collection
     assert min(entry.level for entry in plan) >= 1
 
 
-def test_a_plan_is_ordered_coarsest_first(opened: fabriks.Collection):
+def test_a_plan_is_ordered_coarsest_first(opened: fabriks.Collection) -> None:
     """Stable ordering, so a fetch queue can be built off it directly."""
     plan = opened.plan(error_budget=1.0)
     keys = [(-entry.level, entry.cell) for entry in plan]
@@ -193,19 +197,19 @@ def test_a_plan_is_ordered_coarsest_first(opened: fabriks.Collection):
     assert keys == sorted(keys)
 
 
-def test_a_camera_needs_a_sensible_field_of_view():
+def test_a_camera_needs_a_sensible_field_of_view() -> None:
     """A caller who passes degrees instead of radians should hear about it."""
     with pytest.raises(ValueError, match="radians"):
         fabriks.Camera.perspective((0, 0, 0), fov_y=45.0, viewport_height=1080)
 
 
-def test_max_cells_must_allow_at_least_one_cell(opened: fabriks.Collection):
+def test_max_cells_must_allow_at_least_one_cell(opened: fabriks.Collection) -> None:
     """Zero cells is not a plan."""
     with pytest.raises(ValueError, match="at least one cell"):
         opened.plan(max_cells=0)
 
 
-def test_the_planner_reads_only_the_cell_catalog(written: fabriks.MemoryStore):
+def test_the_planner_reads_only_the_cell_catalog(written: fabriks.MemoryStore) -> None:
     """Planning must not touch geometry -- that is the entire point of the two-catalog split."""
 
     class GeometryIsOffLimits(fabriks.MemoryStore):
@@ -226,7 +230,7 @@ def test_the_planner_reads_only_the_cell_catalog(written: fabriks.MemoryStore):
     assert len(collection.plan()) == len(collection.cells_at(0))
 
 
-def test_planning_over_every_level_of_the_fixture(opened: fabriks.Collection):
+def test_planning_over_every_level_of_the_fixture(opened: fabriks.Collection) -> None:
     """A budget between the levels' errors selects a genuinely mixed plan where one exists."""
     errors = sorted({round(entry.lod_error, 6) for entry in opened.cells.values()})
     assert len(errors) >= 2, (
@@ -240,7 +244,7 @@ def test_planning_over_every_level_of_the_fixture(opened: fabriks.Collection):
 
 def test_max_cells_caps_the_plan_when_the_budget_is_above_the_coarsest_level(
     opened: fabriks.Collection,
-):
+) -> None:
     """Above the floor it behaves as a cap, which is the case a fetch queue is sized for."""
     roots = len(opened.roots())
 
@@ -248,7 +252,9 @@ def test_max_cells_caps_the_plan_when_the_budget_is_above_the_coarsest_level(
         assert len(opened.plan(error_budget=0.0, max_cells=budget)) <= budget
 
 
-def test_max_cells_never_goes_below_the_coarsest_level(opened: fabriks.Collection):
+def test_max_cells_never_goes_below_the_coarsest_level(
+    opened: fabriks.Collection,
+) -> None:
     """It is a descent budget, not a hard cap, and the floor is deliberate.
 
     Going lower would mean dropping a root cell, and a missing cell is a hole in the surface

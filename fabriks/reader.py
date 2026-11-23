@@ -791,13 +791,13 @@ class Collection:
         results = await asyncio.gather(
             *(
                 asyncio.to_thread(decode_group, members, table)
-                for members, table in zip(groups.values(), tables)
+                for members, table in zip(groups.values(), tables, strict=True)
             )
         )
 
         decoded: dict[tuple[int, int], DecodedCell] = {}
-        for members, cells in zip(groups.values(), results):
-            for entry, cell in zip(members, cells):
+        for members, cells in zip(groups.values(), results, strict=True):
+            for entry, cell in zip(members, cells, strict=True):
                 decoded[(entry.level, entry.cell)] = cell
         return [decoded[(entry.level, entry.cell)] for entry in entries]
 
@@ -859,7 +859,7 @@ class Collection:
 
     # -- planning ---------------------------------------------------------- #
 
-    def plan(self, **kwargs: Any) -> list[CellEntry]:  # noqa: ANN401
+    def plan(self, **kwargs: Any) -> list[CellEntry]:
         """Choose which cells to draw at which level. See :func:`fabriks.plan_cells`."""
         return plan_cells(self, **kwargs)
 

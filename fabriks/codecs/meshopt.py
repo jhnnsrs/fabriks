@@ -13,7 +13,7 @@ become required here rather than merely checked.
 
 from __future__ import annotations
 
-from typing import Any
+from types import ModuleType
 
 import numpy as np
 import numpy.typing as npt
@@ -26,7 +26,9 @@ from fabriks.manifest import CODEC_MESHOPT, CODEC_NONE
 STRIDE = 8
 
 
-def require_meshoptimizer(what: str = f"`codec={CODEC_MESHOPT!r}`") -> Any:  # noqa: ANN401
+def require_meshoptimizer(
+    what: str = f"`codec={CODEC_MESHOPT!r}`",
+) -> ModuleType:
     """Import meshoptimizer, saying what asked for it when the install is missing it."""
     try:
         import meshoptimizer  # type: ignore
@@ -40,9 +42,9 @@ def require_meshoptimizer(what: str = f"`codec={CODEC_MESHOPT!r}`") -> Any:  # n
 
 
 def _decode_vertices(
-    module: Any,
+    module: ModuleType,
     blob: bytes,
-    vertex_count: int,  # noqa: ANN401
+    vertex_count: int,
 ) -> npt.NDArray[np.uint16]:
     """Decode a meshopt vertex buffer to ``(n, 4)`` uint16, avoiding the binding's unsafe path.
 

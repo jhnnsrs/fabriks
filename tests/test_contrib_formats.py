@@ -13,6 +13,7 @@ changed.
 from __future__ import annotations
 
 import io
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -51,7 +52,7 @@ MERGING = {
 
 
 @pytest.fixture()
-def source():
+def source() -> trimesh.Scene:
     """A two-object scene: one name that is already an id, one that is not."""
     scene = trimesh.Scene()
     scene.add_geometry(
@@ -66,7 +67,7 @@ def source():
 
 
 @pytest.fixture()
-def written(source):
+def written(source: trimesh.Scene) -> fabriks.Collection:
     """The scene read in through GLB, as an opened collection."""
     store = fabriks.MemoryStore()
     read_glb(
@@ -80,7 +81,7 @@ def written(source):
     return fabriks.open_collection(store, "c")
 
 
-def quantum(collection):
+def quantum(collection: fabriks.Collection) -> float:
     """One level-0 position quantum, in the source's own units.
 
     ``cell_size / QUANT_MAX`` is the finest distance the format can represent inside a cell; the
@@ -90,7 +91,7 @@ def quantum(collection):
     return max(collection.grid.cell_size) / fabriks.QUANT_MAX / fit.scale
 
 
-def reload(blob, file_type):
+def reload(blob: bytes, file_type: str) -> trimesh.Scene:
     """Read exported bytes back into trimesh, splitting objects where the format has them."""
     kwargs = (
         {"split_objects": True, "group_material": False, "skip_materials": True}
@@ -102,7 +103,9 @@ def reload(blob, file_type):
 
 
 @pytest.mark.parametrize("file_type", sorted(NAMED))
-def test_two_objects_come_back_under_their_own_names(file_type, source, written):
+def test_two_objects_come_back_under_their_own_names(
+    file_type: str, source: trimesh.Scene, written: fabriks.Collection
+) -> None:
     """The point of the whole package: identity survives a trip out to a file and home again.
 
     A merged export loses nothing visible -- the geometry is all there and the vertex count is
@@ -119,7 +122,9 @@ def test_two_objects_come_back_under_their_own_names(file_type, source, written)
 
 
 @pytest.mark.parametrize("file_type", sorted(NAMED))
-def test_an_object_comes_back_where_it_started(file_type, source, written):
+def test_an_object_comes_back_where_it_started(
+    file_type: str, source: trimesh.Scene, written: fabriks.Collection
+) -> None:
     """Bounds, not vertices: `object_mesh` welds an object's pieces, so neither count nor order
     of vertices survives by design. Where the surface *is* does.
 
@@ -144,7 +149,9 @@ def test_an_object_comes_back_where_it_started(file_type, source, written):
 
 
 @pytest.mark.parametrize("file_type", sorted(NAMED))
-def test_a_collection_survives_being_written_out_and_read_back(file_type, written):
+def test_a_collection_survives_being_written_out_and_read_back(
+    file_type: str, written: fabriks.Collection
+) -> None:
     """The full loop: a collection out to a file, back into a second collection, same ids.
 
     This is the test that the integer-name rule earns its keep -- without it the second
@@ -170,7 +177,9 @@ def test_a_collection_survives_being_written_out_and_read_back(file_type, writte
 
 
 @pytest.mark.parametrize("file_type", sorted(MERGING))
-def test_a_format_without_names_comes_back_as_one_object(file_type, written):
+def test_a_format_without_names_comes_back_as_one_object(
+    file_type: str, written: fabriks.Collection
+) -> None:
     """PLY, STL and OFF hold a surface and not who it belongs to.
 
     Asserted rather than worked around: an adapter that looked like the OBJ one and quietly
@@ -196,7 +205,9 @@ def test_a_format_without_names_comes_back_as_one_object(file_type, written):
 
 
 @pytest.mark.parametrize("file_type", sorted(MERGING))
-def test_a_merged_format_still_holds_the_whole_model(file_type, source, written):
+def test_a_merged_format_still_holds_the_whole_model(
+    file_type: str, source: trimesh.Scene, written: fabriks.Collection
+) -> None:
     """Merging is allowed to lose identity. It is not allowed to lose geometry."""
     _, write = MERGING[file_type]
     tolerance = 3 * quantum(written)
@@ -209,7 +220,9 @@ def test_a_merged_format_still_holds_the_whole_model(file_type, source, written)
     )
 
 
-def test_a_gltf_goes_out_and_comes_back_through_its_own_mapping(written):
+def test_a_gltf_goes_out_and_comes_back_through_its_own_mapping(
+    written: fabriks.Collection,
+) -> None:
     """A `.gltf` is a document plus its buffers, and both halves have to make the trip.
 
     `write_gltf` hands back exactly the mapping `read_gltf` takes, which is the round trip that
@@ -231,7 +244,9 @@ def test_a_gltf_goes_out_and_comes_back_through_its_own_mapping(written):
     assert {entry.name for entry in again.objects.values()} == {"7", "head"}
 
 
-def test_a_gltf_blob_whose_buffers_are_elsewhere_says_what_to_pass_instead(written):
+def test_a_gltf_blob_whose_buffers_are_elsewhere_says_what_to_pass_instead(
+    written: fabriks.Collection,
+) -> None:
     """trimesh fails this case with `'NoneType' object is not subscriptable`, from deep inside.
 
     A bare blob has no directory to resolve a sibling `.bin` against, so the document is checked
@@ -244,7 +259,9 @@ def test_a_gltf_blob_whose_buffers_are_elsewhere_says_what_to_pass_instead(writt
         read_gltf(blob[document], fabriks.MemoryStore(), "c", axes=("x", "y", "z"))
 
 
-def test_a_gltf_read_from_a_path_finds_its_own_buffers(written, tmp_path):
+def test_a_gltf_read_from_a_path_finds_its_own_buffers(
+    written: fabriks.Collection, tmp_path: Path
+) -> None:
     """A path is the one source shape that lets trimesh's resolver reach the sibling files."""
     write_gltf(written, tmp_path / "model.gltf")
     store = fabriks.MemoryStore()
@@ -266,14 +283,16 @@ def test_a_gltf_read_from_a_path_finds_its_own_buffers(written, tmp_path):
     }
 
 
-def test_an_export_written_to_a_path_lands_there(written, tmp_path):
+def test_an_export_written_to_a_path_lands_there(
+    written: fabriks.Collection, tmp_path: Path
+) -> None:
     """`target` is the convenience that saves a caller a `write_bytes`, and it must actually write."""
     blob = write_glb(written, tmp_path / "model.glb")
 
     assert (tmp_path / "model.glb").read_bytes() == blob
 
 
-def test_a_coarse_level_is_coarser(written):
+def test_a_coarse_level_is_coarser(written: fabriks.Collection) -> None:
     """Exporting level 2 rather than level 0 should cost triangles, which is the whole point."""
     fine = reload(write_glb(written, level=0), "glb")
     coarse = reload(write_glb(written, level=2), "glb")

@@ -11,7 +11,9 @@ import fabriks
 from tests.conftest import CELL_SIZE, LEVELS
 
 
-def test_opening_reads_the_manifest_and_nothing_else(written: fabriks.MemoryStore):
+def test_opening_reads_the_manifest_and_nothing_else(
+    written: fabriks.MemoryStore,
+) -> None:
     """Reading is lazy in the order the format is: declarations, then index, then geometry."""
 
     class CountingStore(fabriks.MemoryStore):
@@ -38,7 +40,7 @@ def test_opening_reads_the_manifest_and_nothing_else(written: fabriks.MemoryStor
 
 def test_the_declarations_survive_the_round_trip(
     collection: fabriks.MeshCollection, opened: fabriks.Collection
-):
+) -> None:
     """What the writer declared is what a renderer configures its decoder from."""
     assert opened.manifest.spec_version == fabriks.SPEC_VERSION
     assert opened.grid.cell_size == CELL_SIZE
@@ -49,7 +51,7 @@ def test_the_declarations_survive_the_round_trip(
 
 def test_the_cell_catalog_answers_which_cells_without_opening_geometry(
     opened: fabriks.Collection,
-):
+) -> None:
     """The whole reason the spatial index is a separate file."""
     assert len(opened.cells) > 0
     assert {entry.level for entry in opened.cells.values()} == set(range(LEVELS))
@@ -61,7 +63,9 @@ def test_the_cell_catalog_answers_which_cells_without_opening_geometry(
         assert np.all(np.asarray(entry.bbox_min) <= np.asarray(entry.bbox_max))
 
 
-def test_a_cell_decodes_into_the_geometry_it_declares(opened: fabriks.Collection):
+def test_a_cell_decodes_into_the_geometry_it_declares(
+    opened: fabriks.Collection,
+) -> None:
     """The counts in the catalog are the counts in the blobs."""
     for entry in opened.cells.values():
         cell = opened.read_cell(entry.level, entry.cell)
@@ -74,7 +78,7 @@ def test_a_cell_decodes_into_the_geometry_it_declares(opened: fabriks.Collection
         )
 
 
-def test_a_cells_bounds_match_the_geometry_it_holds(opened: fabriks.Collection):
+def test_a_cells_bounds_match_the_geometry_it_holds(opened: fabriks.Collection) -> None:
     """The catalog's bbox is what a planner culls on, so it has to be the real extent."""
     for entry in opened.cells.values():
         cell = opened.read_cell(entry.level, entry.cell)
@@ -88,7 +92,9 @@ def test_a_cells_bounds_match_the_geometry_it_holds(opened: fabriks.Collection):
         )
 
 
-def test_one_object_can_be_isolated_out_of_a_shared_cell(opened: fabriks.Collection):
+def test_one_object_can_be_isolated_out_of_a_shared_cell(
+    opened: fabriks.Collection,
+) -> None:
     """Indices are cell-global, so isolating an object means re-basing them -- easy to get wrong."""
     shared = [entry for entry in opened.cells.values() if entry.object_count > 1]
     if not shared:
@@ -111,7 +117,7 @@ def test_one_object_can_be_isolated_out_of_a_shared_cell(opened: fabriks.Collect
 
 def test_asking_a_cell_for_an_object_it_does_not_hold_says_so(
     opened: fabriks.Collection,
-):
+) -> None:
     """A KeyError naming what is there beats an IndexError from a slice."""
     entry = next(iter(opened.cells.values()))
     cell = opened.read_cell(entry.level, entry.cell)
@@ -122,7 +128,7 @@ def test_asking_a_cell_for_an_object_it_does_not_hold_says_so(
 
 def test_the_object_catalog_answers_where_an_object_is(
     opened: fabriks.Collection, objects: dict
-):
+) -> None:
     """The inverted index doing its one job: a lookup rather than a scan."""
     assert set(opened.objects) == set(objects)
 
@@ -137,7 +143,7 @@ def test_the_object_catalog_answers_where_an_object_is(
 
 def test_an_object_is_reassembled_across_the_cells_that_hold_it(
     opened: fabriks.Collection, objects: dict
-):
+) -> None:
     """The end-to-end form: lookup, one fetch per named cell, then weld."""
     for object_id, source in objects.items():
         reassembled = opened.object_mesh(object_id, level=0)
@@ -152,7 +158,7 @@ def test_an_object_is_reassembled_across_the_cells_that_hold_it(
         assert len(reassembled.faces) > 0
 
 
-def test_an_object_is_present_at_every_level(opened: fabriks.Collection):
+def test_an_object_is_present_at_every_level(opened: fabriks.Collection) -> None:
     """A level is a standalone representation, checked from the reader's side this time."""
     for object_id in opened.objects:
         for level in range(LEVELS):
@@ -161,7 +167,9 @@ def test_an_object_is_present_at_every_level(opened: fabriks.Collection):
             )
 
 
-def test_asking_for_an_object_that_is_not_there_says_so(opened: fabriks.Collection):
+def test_asking_for_an_object_that_is_not_there_says_so(
+    opened: fabriks.Collection,
+) -> None:
     """Naming the collection's contents beats a bare KeyError."""
     with pytest.raises(KeyError, match="no object"):
         opened.cells_for_object(424242)
@@ -169,7 +177,7 @@ def test_asking_for_an_object_that_is_not_there_says_so(opened: fabriks.Collecti
 
 def test_children_are_read_off_the_mask_without_touching_the_catalog(
     opened: fabriks.Collection,
-):
+) -> None:
     """Descending has to be free, or the octree costs more than it saves."""
     for entry in opened.cells.values():
         for key in entry.children():
@@ -177,7 +185,7 @@ def test_children_are_read_off_the_mask_without_touching_the_catalog(
             assert key in opened.cells
 
 
-def test_the_roots_are_the_coarsest_level(opened: fabriks.Collection):
+def test_the_roots_are_the_coarsest_level(opened: fabriks.Collection) -> None:
     """Where a descent starts."""
     roots = opened.roots()
 
@@ -187,7 +195,7 @@ def test_the_roots_are_the_coarsest_level(opened: fabriks.Collection):
 
 def test_reading_a_cell_that_is_not_there_says_which_level_was_asked(
     opened: fabriks.Collection,
-):
+) -> None:
     """An error that names the level saves a round of guessing."""
     with pytest.raises(KeyError, match="Level 0 holds no cell"):
         opened.read_cell(0, 999999)
@@ -195,7 +203,7 @@ def test_reading_a_cell_that_is_not_there_says_which_level_was_asked(
 
 def test_a_collection_can_be_opened_at_the_root_of_a_store(
     collection: fabriks.MeshCollection,
-):
+) -> None:
     """A granted prefix is usually already rooted at the collection, so the prefix is empty."""
     store = fabriks.MemoryStore()
     fabriks.write_collection(collection, store)
@@ -208,7 +216,7 @@ def test_a_collection_can_be_opened_at_the_root_of_a_store(
 
 def test_a_prefix_with_no_manifest_at_all_is_refused(
     collection: fabriks.MeshCollection,
-):
+) -> None:
     """An empty prefix is an unfinished upload, not an empty collection."""
     with pytest.raises(fabriks.UnfinishedCollectionError):
         fabriks.open_collection(fabriks.MemoryStore(), "nothing-here")
@@ -216,7 +224,7 @@ def test_a_prefix_with_no_manifest_at_all_is_refused(
 
 def test_a_level_is_found_by_listing_when_the_manifest_does_not_name_its_parts(
     collection: fabriks.MeshCollection,
-):
+) -> None:
     """`files` is a claim, not authority -- the prefix listing is what actually holds.
 
     fabriks always writes `files.levels`, so this branch never runs on a tree fabriks produced.
@@ -243,7 +251,7 @@ def test_a_level_is_found_by_listing_when_the_manifest_does_not_name_its_parts(
 
 def test_the_listing_fallback_works_at_the_root_of_a_store(
     collection: fabriks.MeshCollection,
-):
+) -> None:
     """The empty-prefix case is where the path arithmetic is easiest to get off by one."""
     store = fabriks.MemoryStore()
     fabriks.write_collection(collection, store)
@@ -260,7 +268,7 @@ def test_the_listing_fallback_works_at_the_root_of_a_store(
 
 def test_the_listing_fallback_still_finds_a_level_written_under_the_old_hive_name(
     collection: fabriks.MeshCollection,
-):
+) -> None:
     """``level=0`` was the name before ``=`` turned out to be a signing hazard.
 
     Both spellings declare the same specVersion, so the version number cannot tell a reader
@@ -286,7 +294,7 @@ def test_the_listing_fallback_still_finds_a_level_written_under_the_old_hive_nam
 
 def test_a_level_with_nothing_stored_under_it_says_so(
     collection: fabriks.MeshCollection,
-):
+) -> None:
     """A gap the manifest does not admit to is still a gap, and it is named rather than empty."""
     store = fabriks.MemoryStore()
     fabriks.write_collection(collection, store, "collection")

@@ -17,7 +17,7 @@ from fabriks.octree import cell_box
 @pytest.mark.parametrize(
     "compression", [fabriks.COMPRESSION_NONE, fabriks.COMPRESSION_ZSTD]
 )
-def test_positions_round_trip_within_a_quantum(compression: str):
+def test_positions_round_trip_within_a_quantum(compression: str) -> None:
     """The quantization error is bounded by the cell's own quantum, however the blob is stored."""
     cell_size = (128, 128, 64)
     cell = fabriks.morton_encode_one((1, 2, 3))
@@ -44,7 +44,7 @@ def test_positions_round_trip_within_a_quantum(compression: str):
     )
 
 
-def test_an_uncompressed_positions_blob_is_six_bytes_per_vertex():
+def test_an_uncompressed_positions_blob_is_six_bytes_per_vertex() -> None:
     """Under `codec: NONE` the blob is exactly three interleaved little-endian uint16."""
     cell_size = (128, 128, 64)
     origin, _ = cell_box(0, 0, cell_size)
@@ -69,7 +69,7 @@ def test_an_uncompressed_positions_blob_is_six_bytes_per_vertex():
     ]
 
 
-def test_a_vertex_outside_its_cell_is_refused_rather_than_clamped():
+def test_a_vertex_outside_its_cell_is_refused_rather_than_clamped() -> None:
     """The one check that cannot be recovered downstream.
 
     Clamping would produce a blob of the right length with the right column types, and the only
@@ -85,7 +85,7 @@ def test_a_vertex_outside_its_cell_is_refused_rather_than_clamped():
         )
 
 
-def test_a_boundary_vertex_is_not_mistaken_for_a_stray_one():
+def test_a_boundary_vertex_is_not_mistaken_for_a_stray_one() -> None:
     """A vertex exactly on the far face quantizes to 65535, and must not trip the check."""
     blob = fabriks.encode_positions(
         np.array([[128.0, 128.0, 64.0]]),
@@ -104,7 +104,7 @@ def test_a_boundary_vertex_is_not_mistaken_for_a_stray_one():
 @pytest.mark.parametrize(
     "compression", [fabriks.COMPRESSION_NONE, fabriks.COMPRESSION_ZSTD]
 )
-def test_indices_round_trip_as_the_same_triangles(compression: str):
+def test_indices_round_trip_as_the_same_triangles(compression: str) -> None:
     """MESHOPT preserves triangle order but may rotate a triangle's starting vertex.
 
     Same three corners, same winding, identical surface -- so the check is on the corner sets,
@@ -123,7 +123,7 @@ def test_indices_round_trip_as_the_same_triangles(compression: str):
     ]
 
 
-def test_decoding_meshopt_without_a_count_is_refused():
+def test_decoding_meshopt_without_a_count_is_refused() -> None:
     """The encoded buffer carries no length, which is why the geometry row has the column."""
     with pytest.raises(ValueError, match="`vertex_count` is required"):
         fabriks.decode_positions(
@@ -137,7 +137,7 @@ def test_decoding_meshopt_without_a_count_is_refused():
         fabriks.decode_indices(b"", compression=fabriks.COMPRESSION_ZSTD)
 
 
-def test_a_compressed_blob_needs_its_row_to_know_its_length():
+def test_a_compressed_blob_needs_its_row_to_know_its_length() -> None:
     """The ZSTD framing carries no content size, so the row's counts *are* the length.
 
     Stated as a test because it is the one thing a decoder in another language could get wrong
@@ -173,7 +173,7 @@ def test_a_compressed_blob_needs_its_row_to_know_its_length():
     assert decoded.shape == vertices.shape
 
 
-def test_an_unknown_codec_or_compression_is_refused_by_name():
+def test_an_unknown_codec_or_compression_is_refused_by_name() -> None:
     """A stale constant should be told, not silently handed the raw layout."""
     with pytest.raises(fabriks.FormatError, match="`codec` is"):
         fabriks.encode_positions(

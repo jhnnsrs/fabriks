@@ -235,7 +235,9 @@ def blob_sizes(table: pa.Table) -> list[int]:
     """
     positions = table.column("positions").to_pylist()
     indices = table.column("indices").to_pylist()
-    return [len(p or b"") + len(i or b"") for p, i in zip(positions, indices)]
+    return [
+        len(p or b"") + len(i or b"") for p, i in zip(positions, indices, strict=True)
+    ]
 
 
 def plan_byte_chunks(sizes: Sequence[int], budget: int) -> list[tuple[int, int]]:

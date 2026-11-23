@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import warnings
+from collections.abc import Iterator
 from typing import Any
 
 import numpy as np
@@ -105,7 +106,7 @@ def a_level_zero_cell(collection: fabriks.Collection) -> fabriks.CellEntry:
     )
 
 
-def test_the_level_actually_splits_into_row_groups(chunked: AccountingStore):
+def test_the_level_actually_splits_into_row_groups(chunked: AccountingStore) -> None:
     """Every measurement below is vacuous if the level came out as one row group."""
     manifest = fabriks.open_collection(chunked, "c").manifest
     parts = manifest.level_files(0) or []
@@ -118,7 +119,7 @@ def test_the_level_actually_splits_into_row_groups(chunked: AccountingStore):
 
 def test_reading_a_cell_costs_about_one_row_group(
     chunked: AccountingStore, measured: fabriks.Collection
-):
+) -> None:
     """The whole point, stated as the number it has to be.
 
     ``warm < level`` would be satisfied by a read of nearly the entire level, so it is not the
@@ -159,7 +160,7 @@ def test_reading_a_cell_costs_about_one_row_group(
 
 def test_a_located_read_beats_reading_the_level_whole(
     chunked: AccountingStore, measured: fabriks.Collection
-):
+) -> None:
     """The comparison against the fallback, which is the thing the locator replaced."""
     entry = a_level_zero_cell(measured)
 
@@ -179,7 +180,7 @@ def test_a_located_read_beats_reading_the_level_whole(
 
 def test_reading_a_plan_shares_a_row_group_between_the_cells_in_it(
     chunked: AccountingStore, measured: fabriks.Collection
-):
+) -> None:
     """A plan is Morton-ordered and so is the geometry, so its cells cluster into row groups.
 
     ``read_cells`` exists to spend that adjacency: cells sharing a row group are decoded from
@@ -205,12 +206,14 @@ def test_reading_a_plan_shares_a_row_group_between_the_cells_in_it(
         f"regression this test exists for."
     )
     assert batched_bytes <= serial_bytes
-    for got, expected in zip(batched, serial):
+    for got, expected in zip(batched, serial, strict=True):
         assert np.array_equal(got.vertices, expected.vertices)
         assert np.array_equal(got.faces, expected.faces)
 
 
-def test_read_cells_yields_in_the_order_it_was_asked_for(measured: fabriks.Collection):
+def test_read_cells_yields_in_the_order_it_was_asked_for(
+    measured: fabriks.Collection,
+) -> None:
     """Grouping is an implementation detail, so it must not reorder the caller's selection."""
     keys = [(entry.level, entry.cell) for entry in measured.plan(error_budget=0.4)]
     reversed_keys = list(reversed(keys))
@@ -220,7 +223,7 @@ def test_read_cells_yields_in_the_order_it_was_asked_for(measured: fabriks.Colle
     assert got == reversed_keys
 
 
-def test_every_cell_with_geometry_is_located(measured: fabriks.Collection):
+def test_every_cell_with_geometry_is_located(measured: fabriks.Collection) -> None:
     """A catalog row without a locator is a cell a reader has to go looking for."""
     unlocated = [
         (entry.level, entry.cell)
@@ -233,7 +236,7 @@ def test_every_cell_with_geometry_is_located(measured: fabriks.Collection):
 
 def test_every_cell_reads_back_as_the_size_its_catalog_row_claims(
     measured: fabriks.Collection,
-):
+) -> None:
     """Read every cell through its locator and check it against what the catalog said.
 
     Note what is *not* asserted: that ``decoded.cell == entry.cell``. The reader sets that from
@@ -249,7 +252,9 @@ def test_every_cell_reads_back_as_the_size_its_catalog_row_claims(
         assert set(decoded.object_ids) and len(decoded.object_ids) == entry.object_count
 
 
-def test_a_locator_pointing_at_the_wrong_row_group_is_caught(chunked: AccountingStore):
+def test_a_locator_pointing_at_the_wrong_row_group_is_caught(
+    chunked: AccountingStore,
+) -> None:
     """The guard for a catalog that disagrees with the geometry, which nothing else reaches.
 
     A wrong ``row_group`` is the quiet failure this whole mechanism could have: it does not
@@ -267,7 +272,7 @@ def test_a_locator_pointing_at_the_wrong_row_group_is_caught(chunked: Accounting
     levels = catalog.column("level").to_pylist()
     row = next(
         i
-        for i, (level, group) in enumerate(zip(levels, groups))
+        for i, (level, group) in enumerate(zip(levels, groups, strict=True))
         if level == 0 and group == 0
     )
     moved = [
@@ -289,7 +294,9 @@ def test_a_locator_pointing_at_the_wrong_row_group_is_caught(chunked: Accounting
         opened.read_cell(entry.level, entry.cell)
 
 
-def test_blob_bytes_is_what_the_cell_actually_carries(measured: fabriks.Collection):
+def test_blob_bytes_is_what_the_cell_actually_carries(
+    measured: fabriks.Collection,
+) -> None:
     """A planner budgets a fetch with this, so it has to be the encoded size, not a guess."""
     table = measured.geometry(0)
     sizes = {
@@ -298,6 +305,7 @@ def test_blob_bytes_is_what_the_cell_actually_carries(measured: fabriks.Collecti
             table.column("cell").to_pylist(),
             table.column("positions").to_pylist(),
             table.column("indices").to_pylist(),
+            strict=True,
         )
     }
 
@@ -308,7 +316,7 @@ def test_blob_bytes_is_what_the_cell_actually_carries(measured: fabriks.Collecti
 
 def test_a_collection_whose_manifest_records_no_length_still_reads(
     collection: fabriks.MeshCollection,
-):
+) -> None:
     """A hand-written manifest names paths and nothing else; that must be slow, not broken.
 
     The recorded byte length is what lets a reader seek to a Parquet footer without being able
@@ -335,7 +343,9 @@ def test_a_collection_whose_manifest_records_no_length_still_reads(
     assert len(decoded.vertices) == entry.vertex_count
 
 
-def test_a_store_that_cannot_range_read_still_reads(collection: fabriks.MeshCollection):
+def test_a_store_that_cannot_range_read_still_reads(
+    collection: fabriks.MeshCollection,
+) -> None:
     """``get_range`` is optional, and its absence degrades rather than fails."""
 
     class NoRanges:
@@ -350,7 +360,7 @@ def test_a_store_that_cannot_range_read_still_reads(collection: fabriks.MeshColl
         def get(self, path: str) -> bytes:
             return self.inner.get(path)
 
-        def list(self, prefix: str | None = None):
+        def list(self, prefix: str | None = None) -> Iterator[str]:
             return self.inner.list(prefix)
 
     store = NoRanges()
@@ -365,7 +375,7 @@ def test_a_store_that_cannot_range_read_still_reads(collection: fabriks.MeshColl
 
 def test_releasing_drops_the_geometry_and_keeps_the_catalogs(
     measured: fabriks.Collection,
-):
+) -> None:
     """A long-lived viewer must be able to let go of levels without re-opening the collection."""
     measured.geometry(0)
     entry = a_level_zero_cell(measured)
@@ -384,7 +394,7 @@ def test_releasing_drops_the_geometry_and_keeps_the_catalogs(
 
 def test_the_round_trip_is_unchanged_by_how_finely_it_was_chunked(
     collection: fabriks.MeshCollection,
-):
+) -> None:
     """Row-group size is a transfer-shaping knob and must not touch the geometry."""
     coarse, fine = fabriks.MemoryStore(), fabriks.MemoryStore()
     fabriks.write_collection(collection, coarse, "c", row_group_bytes=1024 * 1024)
@@ -403,7 +413,7 @@ def test_the_round_trip_is_unchanged_by_how_finely_it_was_chunked(
         assert left.object_ids == right.object_ids
 
 
-def test_the_grid_survives_a_chunked_write(chunked: AccountingStore):
+def test_the_grid_survives_a_chunked_write(chunked: AccountingStore) -> None:
     """The declarations are the collection's identity; chunking is about bytes, not meaning."""
     opened = fabriks.open_collection(chunked, "c")
 

@@ -38,7 +38,7 @@ def round_trip_at(point: np.ndarray, level: int) -> np.ndarray:
     )[0]
 
 
-def test_a_plane_shared_by_every_level_decodes_identically_at_every_level():
+def test_a_plane_shared_by_every_level_decodes_identically_at_every_level() -> None:
     """This is ``LOCKED``: the two sides of a shared face agree, whatever level draws them.
 
     The plane chosen is a face at every level -- a multiple of the *coarsest* cell extent --
@@ -58,7 +58,7 @@ def test_a_plane_shared_by_every_level_decodes_identically_at_every_level():
         )
 
 
-def test_a_tangential_coordinate_is_snapped_onto_the_coarsest_lattice():
+def test_a_tangential_coordinate_is_snapped_onto_the_coarsest_lattice() -> None:
     """The second half of the snap, and the one that is easy to leave out.
 
     A coordinate *along* a shared face still has to land somewhere every level can name, or the
@@ -80,7 +80,7 @@ def test_a_tangential_coordinate_is_snapped_onto_the_coarsest_lattice():
         )
 
 
-def test_an_interior_vertex_is_left_alone():
+def test_an_interior_vertex_is_left_alone() -> None:
     """Snapping an interior vertex would spend the precision the finest level exists to carry."""
     point = np.array([60.123456, 70.654321, 33.111111])
     snapped, boundary = snap_boundary(point.reshape(1, 3), CELL_SIZE, COARSE_EXTENT)
@@ -89,7 +89,7 @@ def test_an_interior_vertex_is_left_alone():
     assert snapped[0] == pytest.approx(point, abs=0.0)
 
 
-def test_the_on_plane_window_is_a_full_coarse_quantum_wide():
+def test_the_on_plane_window_is_a_full_coarse_quantum_wide() -> None:
     """The width is load-bearing, not a tolerance.
 
     A vertex nearer to a plane than half a coarse quantum would be snapped *across* it if it
@@ -107,7 +107,7 @@ def test_the_on_plane_window_is_a_full_coarse_quantum_wide():
     )
 
 
-def test_decimation_never_moves_a_fixed_vertex():
+def test_decimation_never_moves_a_fixed_vertex() -> None:
     """``LOCKED`` is boundary immobility, and this is that property directly."""
     rng = np.random.default_rng(7)
     grid = np.stack(
@@ -130,7 +130,7 @@ def test_decimation_never_moves_a_fixed_vertex():
         )
 
 
-def test_decimation_reaches_its_target_when_nothing_is_pinned():
+def test_decimation_reaches_its_target_when_nothing_is_pinned() -> None:
     """``QUARTER`` is a face-count ratio, so hitting the count is the whole obligation."""
     sphere = trimesh.creation.icosphere(subdivisions=3)
     vertices = np.asarray(sphere.vertices, dtype=np.float64)
@@ -147,7 +147,7 @@ def test_decimation_reaches_its_target_when_nothing_is_pinned():
     assert moved > 0.0, "the displacement is the decimation half of lod_error"
 
 
-def test_a_small_object_is_not_decimated_out_of_existence():
+def test_a_small_object_is_not_decimated_out_of_existence() -> None:
     """A level is a standalone representation, so an object may not vanish from a coarse one.
 
     The failure this guards is silent in the worst way: a level that lost a row looks exactly
@@ -168,7 +168,7 @@ def test_a_small_object_is_not_decimated_out_of_existence():
         assert 5 in shard.column("object_ids")[0].as_py()
 
 
-def test_on_planes_finds_the_faces_of_the_level_it_is_asked_about():
+def test_on_planes_finds_the_faces_of_the_level_it_is_asked_about() -> None:
     """Which vertices a level may not move is a per-level question, not a global one."""
     vertices = np.array([[128.0, 10.0, 10.0], [60.0, 10.0, 10.0]])
 
@@ -224,7 +224,7 @@ def _clip_one_cell_at_a_time(subject: trimesh.Trimesh, cell_size: np.ndarray) ->
 )
 def test_bisection_clipping_cuts_the_same_cells_as_cutting_each_cell_out(
     body: trimesh.Trimesh,
-):
+) -> None:
     """The bisection is a speed change only: same cells, same surface in each."""
     cell_size = np.array([32, 32, 32], dtype=np.int64)
     expected = _clip_one_cell_at_a_time(body, cell_size)

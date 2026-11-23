@@ -22,7 +22,7 @@ from fabriks.stores import (
 )
 
 
-def test_obstore_satisfies_the_protocol_with_no_adapter():
+def test_obstore_satisfies_the_protocol_with_no_adapter() -> None:
     """The reason the protocol has this exact shape.
 
     obstore's stores expose ``put``/``get``/``list`` as methods, so an ``S3Store`` or a
@@ -43,7 +43,7 @@ def test_obstore_satisfies_the_protocol_with_no_adapter():
 )
 def test_the_same_tree_lands_in_every_kind_of_store(
     collection: fabriks.MeshCollection, tmp_path: Path, kind: str
-):
+) -> None:
     """On disk or on S3, the layout is the layout. Nothing above the store knows which it has."""
     if kind == "memory":
         store: object = fabriks.MemoryStore()
@@ -76,7 +76,7 @@ def test_the_same_tree_lands_in_every_kind_of_store(
 
 def test_a_directory_store_writes_the_tree_a_shell_can_see(
     collection: fabriks.MeshCollection, tmp_path: Path
-):
+) -> None:
     """The layout is meant to be legible on disk, not only through an API."""
     fabriks.write_collection(collection, DirectoryStore(tmp_path), "c")
 
@@ -85,14 +85,14 @@ def test_a_directory_store_writes_the_tree_a_shell_can_see(
     assert (tmp_path / "c" / "level1" / "part-00000.parquet").is_file()
 
 
-def test_writing_at_an_empty_prefix_does_not_produce_a_leading_slash():
+def test_writing_at_an_empty_prefix_does_not_produce_a_leading_slash() -> None:
     """A store already rooted at the collection is the common case for a granted prefix."""
     assert join("", "catalog/cells.parquet") == "catalog/cells.parquet"
     assert join("a", "", "b") == "a/b"
     assert join("/a/", "/b/") == "a/b"
 
 
-def test_a_collection_may_not_name_a_file_outside_its_own_tree():
+def test_a_collection_may_not_name_a_file_outside_its_own_tree() -> None:
     """A writer that could escape its prefix is a path-traversal surface in whatever holds the
     credentials, so the escape is refused at the boundary rather than trusted not to happen."""
     store = fabriks.MemoryStore()
@@ -104,7 +104,7 @@ def test_a_collection_may_not_name_a_file_outside_its_own_tree():
     assert validate_relative("level0/part-00000.parquet")
 
 
-def test_get_bytes_accepts_both_flavours_of_result():
+def test_get_bytes_accepts_both_flavours_of_result() -> None:
     """obstore hands back a result object, a hand-rolled store hands back bytes."""
 
     class ResultLike:
@@ -130,7 +130,7 @@ def test_get_bytes_accepts_both_flavours_of_result():
     assert get_bytes(plain, "a") == b"payload"
 
 
-def test_a_store_whose_get_returns_something_unreadable_says_so():
+def test_a_store_whose_get_returns_something_unreadable_says_so() -> None:
     """Better than an AttributeError three frames deeper."""
 
     class Odd:
@@ -146,7 +146,7 @@ def test_a_store_whose_get_returns_something_unreadable_says_so():
         get_bytes(Odd(), "a")  # type: ignore[arg-type]
 
 
-def test_listing_is_flattened_however_the_store_streams_it():
+def test_listing_is_flattened_however_the_store_streams_it() -> None:
     """obstore streams batches of metadata; others yield paths. Both normalise to sorted paths."""
 
     class Batched:
@@ -161,7 +161,7 @@ def test_listing_is_flattened_however_the_store_streams_it():
     assert list_paths(Batched(), "b") == ["b/1", "b/2"]  # type: ignore[arg-type]
 
 
-def test_a_memory_store_lists_only_under_the_prefix_it_is_asked_about():
+def test_a_memory_store_lists_only_under_the_prefix_it_is_asked_about() -> None:
     """A prefix is a directory, so `coll` must not match `collection`."""
     store = fabriks.MemoryStore()
     store.put("coll/a", b"1")

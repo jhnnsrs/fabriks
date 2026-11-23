@@ -89,7 +89,7 @@ def attach(collection: Any, *, names: Mapping[int, str], fit: VoxelFit) -> None:
             pa.array([fit.scale] * len(ids), type=pa.float64()),
         ),
     ]
-    for axis, component in zip(FIT_TRANSLATION_COLUMNS, fit.translation):
+    for axis, component in zip(FIT_TRANSLATION_COLUMNS, fit.translation, strict=True):
         columns.append(
             (
                 pa.field(axis, pa.float64(), nullable=True),
@@ -117,7 +117,7 @@ def names_of(collection: Any) -> dict[int, str]:  # noqa: ANN401 - an opened col
     names = table.column(NAME_COLUMN).to_pylist()
     return {
         object_id: str(name)
-        for object_id, name in zip(_object_ids(table), names)
+        for object_id, name in zip(_object_ids(table), names, strict=True)
         if name is not None
     }
 

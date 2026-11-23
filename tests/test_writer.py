@@ -28,7 +28,7 @@ class RecordingStore(fabriks.MemoryStore):
         self.order.append(path)
 
 
-def test_the_manifest_is_written_last(collection: fabriks.MeshCollection):
+def test_the_manifest_is_written_last(collection: fabriks.MeshCollection) -> None:
     """The completion protocol in one assertion.
 
     A prefix has no atomic "upload finished" flag, so the manifest landing last is the only
@@ -46,7 +46,7 @@ def test_the_manifest_is_written_last(collection: fabriks.MeshCollection):
 
 def test_everything_the_manifest_names_exists_before_the_manifest_does(
     collection: fabriks.MeshCollection,
-):
+) -> None:
     """The manifest is a promise about the tree, so the tree has to be there first."""
     store = RecordingStore()
 
@@ -67,7 +67,7 @@ def test_everything_the_manifest_names_exists_before_the_manifest_does(
 
 def test_an_interrupted_write_leaves_a_prefix_that_is_refused(
     collection: fabriks.MeshCollection,
-):
+) -> None:
     """Precisely the shape a killed writer leaves, and it must not read as a collection."""
     store = fabriks.MemoryStore()
     fabriks.write_collection(collection, store, "c")
@@ -79,7 +79,7 @@ def test_an_interrupted_write_leaves_a_prefix_that_is_refused(
 
 def test_the_written_manifest_names_the_parts_that_actually_landed(
     collection: fabriks.MeshCollection,
-):
+) -> None:
     """A reader that cannot list a prefix -- an HTTP store -- still has to find every level."""
     store = fabriks.MemoryStore()
 
@@ -99,7 +99,7 @@ def test_the_written_manifest_names_the_parts_that_actually_landed(
 
 def test_a_large_level_is_split_across_parts_and_still_reads_as_one(
     collection: fabriks.MeshCollection,
-):
+) -> None:
     """A level is a directory precisely so this can happen without the layout changing shape."""
     store = fabriks.MemoryStore()
 
@@ -118,7 +118,7 @@ def test_a_large_level_is_split_across_parts_and_still_reads_as_one(
 
 def test_the_levels_written_are_contiguous_from_zero(
     collection: fabriks.MeshCollection,
-):
+) -> None:
     """A gap is geometry a planner never asks for.
 
     A planner descends from the coarsest level it can see, so anything under a missing level is
@@ -135,7 +135,7 @@ def test_the_levels_written_are_contiguous_from_zero(
 
 def test_a_cell_never_spans_more_than_its_declared_cell_size_allows(
     collection: fabriks.MeshCollection,
-):
+) -> None:
     """A cell's geometry lives inside its address box, which is what makes ``cell_size`` checkable.
 
     Positions are quantized to exactly that box, so an observed extent larger than
@@ -149,15 +149,17 @@ def test_a_cell_never_spans_more_than_its_declared_cell_size_allows(
 
     for entry in opened.cells.values():
         allowed = opened.grid.cell_extent(entry.level)
-        observed = [high - low for low, high in zip(entry.bbox_min, entry.bbox_max)]
-        for axis, (span, limit) in enumerate(zip(observed, allowed)):
+        observed = [
+            high - low for low, high in zip(entry.bbox_min, entry.bbox_max, strict=True)
+        ]
+        for axis, (span, limit) in enumerate(zip(observed, allowed, strict=True)):
             assert span <= limit + 1e-6, (
                 f"cell {entry.cell} at level {entry.level} spans {span} on axis {axis}, past the {limit} its "
                 f"declared cell_size allows"
             )
 
 
-def test_the_declared_index_width_is_the_one_the_blobs_use():
+def test_the_declared_index_width_is_the_one_the_blobs_use() -> None:
     """fabriks declares ``UINT32`` because it writes uint32, not because it is the safe default.
 
     Checked against the bytes rather than against the declaration: under ``codec: NONE`` the
@@ -186,7 +188,7 @@ def test_the_declared_index_width_is_the_one_the_blobs_use():
         )
 
 
-def test_a_frame_missing_a_required_column_is_refused_before_any_write():
+def test_a_frame_missing_a_required_column_is_refused_before_any_write() -> None:
     """The earliest point the mistake is catchable and the only point it is cheap."""
     pa = pytest.importorskip("pyarrow")
     broken = pa.table({"level": [0]})
@@ -195,7 +197,9 @@ def test_a_frame_missing_a_required_column_is_refused_before_any_write():
         fabriks.validate_columns(broken, "cell_catalog")
 
 
-def test_write_meshes_builds_and_writes_in_one_call(objects: dict, tmp_path: Path):
+def test_write_meshes_builds_and_writes_in_one_call(
+    objects: dict, tmp_path: Path
+) -> None:
     """The convenience form, and the one most callers will use."""
     store = DirectoryStore(tmp_path)
 
@@ -208,7 +212,9 @@ def test_write_meshes_builds_and_writes_in_one_call(objects: dict, tmp_path: Pat
     assert (tmp_path / "c" / "fabriks.json").is_file()
 
 
-def test_the_async_writer_produces_the_same_tree(collection: fabriks.MeshCollection):
+def test_the_async_writer_produces_the_same_tree(
+    collection: fabriks.MeshCollection,
+) -> None:
     """Mirrors the sync path rather than reimplementing it, so the ordering cannot drift."""
     synchronous = fabriks.MemoryStore()
     fabriks.write_collection(collection, synchronous, "c")
@@ -224,7 +230,7 @@ def test_the_async_writer_produces_the_same_tree(collection: fabriks.MeshCollect
 
 def test_writing_twice_replaces_rather_than_accumulates(
     collection: fabriks.MeshCollection,
-):
+) -> None:
     """A collection is immutable per version, but a retried write must not leave debris."""
     store = fabriks.MemoryStore()
 
@@ -237,7 +243,7 @@ def test_writing_twice_replaces_rather_than_accumulates(
 
 def test_the_parquet_codec_is_the_callers_and_reaches_every_file(
     collection: fabriks.MeshCollection,
-):
+) -> None:
     """A reader that lacks a decoder would draw nothing, so the codec is stated, not inherited."""
     import io
 

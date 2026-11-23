@@ -38,7 +38,7 @@ def a_manifest(**overrides: object) -> dict:
     return base
 
 
-def test_the_layout_is_the_one_the_format_fixes():
+def test_the_layout_is_the_one_the_format_fixes() -> None:
     """These paths are the contract; a reader that cannot list a prefix still finds them."""
     assert fabriks.MANIFEST_NAME == "fabriks.json"
     assert fabriks.CELL_CATALOG_PATH == "catalog/cells.parquet"
@@ -48,7 +48,7 @@ def test_the_layout_is_the_one_the_format_fixes():
     assert level_part_path(0, 13) == "level0/part-00013.parquet"
 
 
-def test_every_name_the_format_fixes_survives_being_signed():
+def test_every_name_the_format_fixes_survives_being_signed() -> None:
     """A path component ends up inside a signed URL, and SigV4 signs the *encoded* path.
 
     A name outside RFC 3986's unreserved set is a name an SDK, a proxy and a hand-rolled
@@ -82,14 +82,14 @@ def test_every_name_the_format_fixes_survives_being_signed():
         )
 
 
-def test_a_manifest_round_trips_through_its_own_bytes():
+def test_a_manifest_round_trips_through_its_own_bytes() -> None:
     """What is written is what is read; nothing is resolved on only one side."""
     manifest = Manifest.from_dict(a_manifest())
 
     assert Manifest.from_json(manifest.to_json()).to_dict() == manifest.to_dict()
 
 
-def test_the_stored_encoding_is_resolved_rather_than_sparse():
+def test_the_stored_encoding_is_resolved_rather_than_sparse() -> None:
     """A renderer configures its decoder from what it reads back.
 
     Defaulting a key inside the writer without persisting it would hand every reader an
@@ -109,7 +109,7 @@ def test_the_stored_encoding_is_resolved_rather_than_sparse():
     }
 
 
-def test_an_unreadable_version_is_refused_rather_than_read_anyway():
+def test_an_unreadable_version_is_refused_rather_than_read_anyway() -> None:
     """The version selects how every byte in the prefix is read."""
     with pytest.raises(fabriks.FormatError, match="cannot read"):
         Manifest.from_dict(a_manifest(specVersion=str(int(fabriks.SPEC_VERSION) + 1)))
@@ -119,7 +119,7 @@ def test_an_unreadable_version_is_refused_rather_than_read_anyway():
         Manifest.from_dict(a_manifest(specVersion=""))
 
 
-def test_a_manifest_without_a_grid_or_an_encoding_is_refused():
+def test_a_manifest_without_a_grid_or_an_encoding_is_refused() -> None:
     """Nothing else in the store states them, so a manifest without them is undecodable."""
     for dropped in ("grid", "encoding"):
         raw = a_manifest()
@@ -130,7 +130,7 @@ def test_a_manifest_without_a_grid_or_an_encoding_is_refused():
             Manifest.from_dict(raw)
 
 
-def test_an_encoding_missing_a_key_a_decoder_needs_is_refused():
+def test_an_encoding_missing_a_key_a_decoder_needs_is_refused() -> None:
     """`codec` and `compression` are exactly the keys that must never be guessed."""
     for dropped in ("codec", "compression", "indices"):
         encoding = dict(a_manifest()["encoding"])  # type: ignore[arg-type]
@@ -139,7 +139,7 @@ def test_an_encoding_missing_a_key_a_decoder_needs_is_refused():
             Manifest.from_dict(a_manifest(encoding=encoding))
 
 
-def test_a_value_outside_the_vocabulary_is_refused():
+def test_a_value_outside_the_vocabulary_is_refused() -> None:
     """An undefined value would be recorded and acted on by a decoder that cannot honour it."""
     with pytest.raises(fabriks.FormatError, match="`encoding.codec`"):
         Encoding(codec="DRACO")
@@ -147,7 +147,7 @@ def test_a_value_outside_the_vocabulary_is_refused():
         Encoding(compression="BROTLI")
 
 
-def test_a_truncated_manifest_is_named_as_an_interrupted_write():
+def test_a_truncated_manifest_is_named_as_an_interrupted_write() -> None:
     """The other shape a killed writer leaves behind, and it should not read as corruption."""
     body = Manifest.from_dict(a_manifest()).to_json()[:40]
 
@@ -155,7 +155,7 @@ def test_a_truncated_manifest_is_named_as_an_interrupted_write():
         Manifest.from_json(body)
 
 
-def test_a_grid_that_cannot_address_geometry_is_refused():
+def test_a_grid_that_cannot_address_geometry_is_refused() -> None:
     """Three components, at least one voxel each, at least one level."""
     with pytest.raises(fabriks.FormatError, match="three whole numbers"):
         Grid(cell_size=(128, 128, 0), levels=3)
@@ -165,7 +165,7 @@ def test_a_grid_that_cannot_address_geometry_is_refused():
         Grid.from_dict({"cellSize": [128, 128], "levels": 2})
 
 
-def test_the_cell_size_is_read_in_x_y_z_and_not_reversed():
+def test_the_cell_size_is_read_in_x_y_z_and_not_reversed() -> None:
     """An anisotropic size read backwards is a legal grid describing a different octree.
 
     Asymmetric on purpose: a cubic fixture passes a reversed implementation.
@@ -179,7 +179,9 @@ def test_the_cell_size_is_read_in_x_y_z_and_not_reversed():
     assert grid.cell_extent(2) == (512.0, 512.0, 256.0)
 
 
-def test_a_manifest_key_this_reader_does_not_know_is_ignored_rather_than_refused():
+def test_a_manifest_key_this_reader_does_not_know_is_ignored_rather_than_refused() -> (
+    None
+):
     """A layer above may record something of its own beside the format's keys.
 
     The unknown key opens the manifest unchanged and is simply not carried into what this
@@ -204,7 +206,7 @@ def test_a_manifest_key_this_reader_does_not_know_is_ignored_rather_than_refused
     }
 
 
-def test_shape_and_axes_are_carried_but_may_be_unknown():
+def test_shape_and_axes_are_carried_but_may_be_unknown() -> None:
     """The manifest carries the collection's extent and axis names, each ``null`` when unknown.
 
     Which physical axis a slot holds is a statement about this collection's relationship to
@@ -237,7 +239,7 @@ def test_shape_and_axes_are_carried_but_may_be_unknown():
     assert declared["axes"] == ["z", "y", "x"]
 
 
-def test_both_blob_knobs_default_to_nothing():
+def test_both_blob_knobs_default_to_nothing() -> None:
     """A collection you get without asking needs no decoder on the reading side.
 
     That is the whole reason `NONE`/`NONE` is the default: the blob a consumer pulls out of the
@@ -258,7 +260,7 @@ def test_both_blob_knobs_default_to_nothing():
         (fabriks.CODEC_MESHOPT, fabriks.COMPRESSION_NONE),
     ],
 )
-def test_the_pairs_the_format_allows(codec: str, compression: str):
+def test_the_pairs_the_format_allows(codec: str, compression: str) -> None:
     """Three of the four combinations are legal, and each is a real choice."""
     written = Encoding(codec=codec, compression=compression).to_dict()
 
@@ -266,7 +268,7 @@ def test_the_pairs_the_format_allows(codec: str, compression: str):
     assert written["compression"] == compression
 
 
-def test_meshopt_with_zstd_is_refused_as_undecodable():
+def test_meshopt_with_zstd_is_refused_as_undecodable() -> None:
     """The one illegal pair, and it is a decodability problem rather than a taste one.
 
     ZSTD framing here carries no content size, so a reader recovers the uncompressed length
@@ -277,6 +279,6 @@ def test_meshopt_with_zstd_is_refused_as_undecodable():
         Encoding(codec=fabriks.CODEC_MESHOPT, compression=fabriks.COMPRESSION_ZSTD)
 
 
-def test_the_manifest_is_named_after_the_format():
+def test_the_manifest_is_named_after_the_format() -> None:
     """`fabriks.json`, at the root of the prefix -- the one file a reader must find by name."""
     assert fabriks.MANIFEST_NAME == "fabriks.json"

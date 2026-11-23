@@ -85,7 +85,7 @@ def edit_geometry(
 @pytest.mark.parametrize("tier", TIERS)
 def test_a_collection_the_writer_wrote_passes_every_tier(
     sound: fabriks.MemoryStore, tier: str
-):
+) -> None:
     """The baseline. Without it, every failure below could just be a broken verifier."""
     report = verify(opened(sound), tier=tier)
 
@@ -94,40 +94,46 @@ def test_a_collection_the_writer_wrote_passes_every_tier(
     assert bool(report) is True
 
 
-def test_the_tiers_are_cumulative_and_cost_more_as_they_go(sound: fabriks.MemoryStore):
+def test_the_tiers_are_cumulative_and_cost_more_as_they_go(
+    sound: fabriks.MemoryStore,
+) -> None:
     """A caller picks a tier by what it can afford, so each must include the cheaper ones."""
     collection = opened(sound)
 
     counts = [len(verify(collection, tier=tier).checks) for tier in TIERS]
 
     assert counts == sorted(counts), (
-        f"tiers should only add checks, got {dict(zip(TIERS, counts))}"
+        f"tiers should only add checks, got {dict(zip(TIERS, counts, strict=True))}"
     )
     assert counts[0] < counts[-1], (
         "the deepest tier must actually check more than the cheapest"
     )
 
 
-def test_an_unknown_tier_is_refused(sound: fabriks.MemoryStore):
+def test_an_unknown_tier_is_refused(sound: fabriks.MemoryStore) -> None:
     """A typo must not silently run the cheapest tier and report a pass."""
     with pytest.raises(ValueError, match="tier"):
         verify(opened(sound), tier="thorough")
 
 
-def test_a_missing_file_is_reported_rather_than_raised(sound: fabriks.MemoryStore):
+def test_a_missing_file_is_reported_rather_than_raised(
+    sound: fabriks.MemoryStore,
+) -> None:
     """The manifest is a promise about the tree; this is the check that it was kept."""
     del sound.objects["c/level1/part-00000.parquet"]
 
     assert "files exist" in failed(sound, tier="structure")
 
 
-def test_a_cleared_child_mask_bit_is_caught(sound: fabriks.MemoryStore):
+def test_a_cleared_child_mask_bit_is_caught(sound: fabriks.MemoryStore) -> None:
     """A cleared bit hides a child and everything below it, with nothing raised anywhere."""
     table = parquet_to_table(sound.objects["c/catalog/cells.parquet"])
     masks = table.column("child_mask").to_pylist()
     levels = table.column("level").to_pylist()
     target = next(
-        i for i, (level, mask) in enumerate(zip(levels, masks)) if level > 0 and mask
+        i
+        for i, (level, mask) in enumerate(zip(levels, masks, strict=True))
+        if level > 0 and mask
     )
     # Turn off one set bit, which is the quietest possible corruption of the octree.
     masks[target] &= masks[target] - 1
@@ -136,7 +142,7 @@ def test_a_cleared_child_mask_bit_is_caught(sound: fabriks.MemoryStore):
     assert failed(sound, tier="structure") == {"child masks name children that exist"}
 
 
-def test_an_inverted_lod_error_is_caught(sound: fabriks.MemoryStore):
+def test_an_inverted_lod_error_is_caught(sound: fabriks.MemoryStore) -> None:
     """A parent more accurate than its child stops a planner descending to the detail it wanted."""
     table = parquet_to_table(sound.objects["c/catalog/cells.parquet"])
     levels = table.column("level").to_pylist()
@@ -150,7 +156,7 @@ def test_an_inverted_lod_error_is_caught(sound: fabriks.MemoryStore):
     )
 
 
-def test_a_missing_locator_is_caught(sound: fabriks.MemoryStore):
+def test_a_missing_locator_is_caught(sound: fabriks.MemoryStore) -> None:
     """A catalog row with no locator is a cell a reader has to go looking for."""
     table = parquet_to_table(sound.objects["c/catalog/cells.parquet"])
     parts = table.column("part").to_pylist()
@@ -162,7 +168,7 @@ def test_a_missing_locator_is_caught(sound: fabriks.MemoryStore):
 
 def test_a_locator_pointing_at_a_part_that_does_not_exist_is_caught(
     sound: fabriks.MemoryStore,
-):
+) -> None:
     """Caught from the manifest alone, so registration rejects it rather than the first viewer."""
     table = parquet_to_table(sound.objects["c/catalog/cells.parquet"])
     parts = table.column("part").to_pylist()
@@ -174,7 +180,9 @@ def test_a_locator_pointing_at_a_part_that_does_not_exist_is_caught(
     )
 
 
-def test_a_row_group_past_the_end_of_its_part_is_caught(sound: fabriks.MemoryStore):
+def test_a_row_group_past_the_end_of_its_part_is_caught(
+    sound: fabriks.MemoryStore,
+) -> None:
     """The manifest records how many row groups a part has, so this is answerable for free."""
     table = parquet_to_table(sound.objects["c/catalog/cells.parquet"])
     groups = table.column("row_group").to_pylist()
@@ -188,7 +196,7 @@ def test_a_row_group_past_the_end_of_its_part_is_caught(sound: fabriks.MemorySto
 
 def test_an_object_catalog_naming_a_cell_that_does_not_exist_is_caught(
     sound: fabriks.MemoryStore,
-):
+) -> None:
     """The identity index is only an index if what it points at is there."""
     table = parquet_to_table(sound.objects["c/catalog/objects.parquet"])
     cells = table.column("cells").to_pylist()
@@ -207,7 +215,7 @@ def test_an_object_catalog_naming_a_cell_that_does_not_exist_is_caught(
 
 def test_a_wrong_vertex_count_is_caught_when_the_blob_is_decoded(
     sound: fabriks.MemoryStore,
-):
+) -> None:
     """Structure cannot see this and blobs must: the count is a claim about bytes."""
     table = parquet_to_table(sound.objects["c/catalog/cells.parquet"])
     counts = table.column("vertex_count").to_pylist()
@@ -220,7 +228,7 @@ def test_a_wrong_vertex_count_is_caught_when_the_blob_is_decoded(
     )
 
 
-def test_a_truncated_blob_is_caught(sound: fabriks.MemoryStore):
+def test_a_truncated_blob_is_caught(sound: fabriks.MemoryStore) -> None:
     """The failure a codec produces is garbage, not an exception, so something must ask."""
     table = parquet_to_table(sound.objects["c/level0/part-00000.parquet"])
     positions = table.column("positions").to_pylist()
@@ -232,7 +240,9 @@ def test_a_truncated_blob_is_caught(sound: fabriks.MemoryStore):
     )
 
 
-def test_a_geometry_row_holding_an_unknown_object_is_caught(sound: fabriks.MemoryStore):
+def test_a_geometry_row_holding_an_unknown_object_is_caught(
+    sound: fabriks.MemoryStore,
+) -> None:
     """The forward and inverted identity indexes are written from one source and must agree."""
     table = parquet_to_table(sound.objects["c/level0/part-00000.parquet"])
     ids = table.column("object_ids").to_pylist()
@@ -244,7 +254,9 @@ def test_a_geometry_row_holding_an_unknown_object_is_caught(sound: fabriks.Memor
     )
 
 
-def test_the_geometry_checks_actually_compared_something(sound: fabriks.MemoryStore):
+def test_the_geometry_checks_actually_compared_something(
+    sound: fabriks.MemoryStore,
+) -> None:
     """A check that compared nothing passes for the wrong reason.
 
     Both cross-level checks count what they looked at, and both would report a serene pass on a
@@ -263,14 +275,16 @@ def test_the_geometry_checks_actually_compared_something(sound: fabriks.MemorySt
     )
 
 
-def test_a_coarse_level_larger_than_the_one_below_is_caught(sound: fabriks.MemoryStore):
+def test_a_coarse_level_larger_than_the_one_below_is_caught(
+    sound: fabriks.MemoryStore,
+) -> None:
     """The inversion the writer warns about: zooming out fetches more and draws worse."""
     table = parquet_to_table(sound.objects["c/catalog/cells.parquet"])
     levels = table.column("level").to_pylist()
     counts = table.column("index_count").to_pylist()
     counts = [
         count * 100 if level == LEVELS - 1 else count
-        for level, count in zip(levels, counts)
+        for level, count in zip(levels, counts, strict=True)
     ]
     edit_catalog(sound, "index_count", counts)
 
@@ -279,7 +293,9 @@ def test_a_coarse_level_larger_than_the_one_below_is_caught(sound: fabriks.Memor
     )
 
 
-def test_an_lod_error_too_small_to_be_true_is_caught(sound: fabriks.MemoryStore):
+def test_an_lod_error_too_small_to_be_true_is_caught(
+    sound: fabriks.MemoryStore,
+) -> None:
     """``lod_error`` is what a planner spends, so a collection understating it draws blurred.
 
     Only the finer levels are shrunk, so the parent-dominance check stays satisfied and this
@@ -290,7 +306,7 @@ def test_an_lod_error_too_small_to_be_true_is_caught(sound: fabriks.MemoryStore)
     errors = table.column("lod_error").to_pylist()
     errors = [
         1e-9 if 0 < level < LEVELS - 1 else error
-        for level, error in zip(levels, errors)
+        for level, error in zip(levels, errors, strict=True)
     ]
     edit_catalog(sound, "lod_error", errors)
 
@@ -299,7 +315,7 @@ def test_an_lod_error_too_small_to_be_true_is_caught(sound: fabriks.MemoryStore)
     )
 
 
-def test_a_boundary_vertex_that_moved_is_caught(sound: fabriks.MemoryStore):
+def test_a_boundary_vertex_that_moved_is_caught(sound: fabriks.MemoryStore) -> None:
     """The claim the whole format rests on: a vertex on a cell face plane did not move.
 
     Nothing downstream can see this -- a renderer looks at one cell and a crack only appears
@@ -365,7 +381,7 @@ def test_a_boundary_vertex_that_moved_is_caught(sound: fabriks.MemoryStore):
     )
 
 
-def test_a_surface_tangent_to_a_cell_plane_is_not_reported_as_drifted():
+def test_a_surface_tangent_to_a_cell_plane_is_not_reported_as_drifted() -> None:
     """The false positive the LOCKED check used to produce, and the reason it did.
 
     A *closed* surface resting exactly on a cell face pins nothing: the plane touches it at one
@@ -401,7 +417,7 @@ def test_a_surface_tangent_to_a_cell_plane_is_not_reported_as_drifted():
     assert report, f"a tangent surface is not a crack:\n{report}"
 
 
-def test_the_on_plane_tolerance_is_cell_relative_and_not_voxels():
+def test_the_on_plane_tolerance_is_cell_relative_and_not_voxels() -> None:
     """The unit itself, pinned -- half a voxel is not "on the plane" of a 256-voxel cell.
 
     Stated directly rather than only through the collection above, because the two figures are
@@ -422,7 +438,9 @@ def test_the_on_plane_tolerance_is_cell_relative_and_not_voxels():
     ).any()
 
 
-def test_the_report_reads_as_something_a_person_would_read(sound: fabriks.MemoryStore):
+def test_the_report_reads_as_something_a_person_would_read(
+    sound: fabriks.MemoryStore,
+) -> None:
     """A report nobody can read is a report nobody reads."""
     del sound.objects["c/level1/part-00000.parquet"]
 
@@ -436,7 +454,7 @@ def test_the_report_reads_as_something_a_person_would_read(sound: fabriks.Memory
     )
 
 
-def test_a_single_level_collection_verifies(objects: dict[int, Any]):
+def test_a_single_level_collection_verifies(objects: dict[int, Any]) -> None:
     """One level means no cross-level claims to check, which must be a pass and not a crash."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -453,7 +471,7 @@ def test_a_single_level_collection_verifies(objects: dict[int, Any]):
 
 def test_the_manifest_and_the_report_agree_on_which_files_exist(
     sound: fabriks.MemoryStore,
-):
+) -> None:
     """``verify_paths`` is what a caller iterates to copy or check a collection by hand."""
     from fabriks.verify import verify_paths
 

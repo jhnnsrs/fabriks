@@ -97,7 +97,7 @@ def served(many: fabriks.MeshCollection) -> ConcurrentStore:
 
 def test_opening_a_collection_without_blocking_reads_the_same_manifest(
     served: ConcurrentStore,
-):
+) -> None:
     """``aopen_collection`` differs from ``open_collection`` in when it yields, not in what it reads."""
     synchronous = fabriks.open_collection(served, "c")
 
@@ -110,7 +110,7 @@ def test_opening_a_collection_without_blocking_reads_the_same_manifest(
 
 def test_opening_an_interrupted_write_is_refused_asynchronously_too(
     served: ConcurrentStore,
-):
+) -> None:
     """The completion protocol is a property of the tree, not of which reader looked at it."""
     del served.objects["c/fabriks.json"]
 
@@ -120,7 +120,7 @@ def test_opening_an_interrupted_write_is_refused_asynchronously_too(
 
 def test_the_async_reader_returns_exactly_what_the_sync_one_does(
     served: ConcurrentStore,
-):
+) -> None:
     """Two paths to the same bytes; a difference between them is a bug in one of them."""
     reference = fabriks.open_collection(served, "c")
     keys = [(entry.level, entry.cell) for entry in reference.plan(error_budget=0.3)]
@@ -131,14 +131,14 @@ def test_the_async_reader_returns_exactly_what_the_sync_one_does(
     assert [(cell.level, cell.cell) for cell in got] == keys, (
         "the caller's order is the answer's order"
     )
-    for actual, wanted in zip(got, expected):
+    for actual, wanted in zip(got, expected, strict=True):
         assert np.array_equal(actual.vertices, wanted.vertices)
         assert np.array_equal(actual.faces, wanted.faces)
         assert actual.object_ids == wanted.object_ids
         assert actual.object_vertex_offsets == wanted.object_vertex_offsets
 
 
-def test_the_reads_actually_overlap(served: ConcurrentStore):
+def test_the_reads_actually_overlap(served: ConcurrentStore) -> None:
     """The whole point. Sequential awaits would leave the peak at one."""
     collection = fabriks.open_collection(served, "c")
     keys = [(entry.level, entry.cell) for entry in collection.plan(error_budget=0.3)]
@@ -155,7 +155,7 @@ def test_the_reads_actually_overlap(served: ConcurrentStore):
     )
 
 
-def test_the_concurrency_bound_is_respected(served: ConcurrentStore):
+def test_the_concurrency_bound_is_respected(served: ConcurrentStore) -> None:
     """A viewer must be able to stop fabriks from opening a hundred sockets at once."""
     collection = fabriks.open_collection(served, "c")
     keys = [(entry.level, entry.cell) for entry in collection.plan(error_budget=0.3)]
@@ -166,7 +166,9 @@ def test_the_concurrency_bound_is_respected(served: ConcurrentStore):
     assert served.peak <= 2, f"asked for 2 at a time, saw {served.peak}"
 
 
-def test_a_store_with_no_async_methods_still_reads(many: fabriks.MeshCollection):
+def test_a_store_with_no_async_methods_still_reads(
+    many: fabriks.MeshCollection,
+) -> None:
     """Async is optional on a store, so its absence runs the sync path in a thread."""
     store = fabriks.MemoryStore()
     fabriks.write_collection(many, store, "c", row_group_bytes=ROW_GROUP_BYTES)
@@ -175,14 +177,14 @@ def test_a_store_with_no_async_methods_still_reads(many: fabriks.MeshCollection)
 
     got = asyncio.run(_read(store, keys))
 
-    for actual, wanted in zip(got, reference.read_cells(keys)):
+    for actual, wanted in zip(got, reference.read_cells(keys), strict=True):
         assert np.array_equal(actual.vertices, wanted.vertices)
         assert np.array_equal(actual.faces, wanted.faces)
 
 
 def test_reading_one_cell_asynchronously_matches_reading_it_synchronously(
     served: ConcurrentStore,
-):
+) -> None:
     """``aread_cell`` is the single-key convenience and must not diverge from the plural form."""
     collection = fabriks.open_collection(served, "c")
     entry = min(
@@ -196,7 +198,9 @@ def test_reading_one_cell_asynchronously_matches_reading_it_synchronously(
     assert np.array_equal(got.faces, expected.faces)
 
 
-def test_an_unknown_cell_is_refused_before_anything_is_fetched(served: ConcurrentStore):
+def test_an_unknown_cell_is_refused_before_anything_is_fetched(
+    served: ConcurrentStore,
+) -> None:
     """The catalog already knows the answer, so the loop should never see a request."""
     collection = fabriks.open_collection(served, "c")
     collection.cells  # noqa: B018 - reading the catalog is setup
@@ -212,7 +216,7 @@ def test_an_unknown_cell_is_refused_before_anything_is_fetched(served: Concurren
     )
 
 
-def test_two_overlapping_reads_open_each_part_once(served: ConcurrentStore):
+def test_two_overlapping_reads_open_each_part_once(served: ConcurrentStore) -> None:
     """A viewer issues more than one read per frame, against one open collection.
 
     Without a guard both would find the part unopened, both would fetch its footer, and both
@@ -241,11 +245,13 @@ def test_two_overlapping_reads_open_each_part_once(served: ConcurrentStore):
     assert parts == handles, (
         "a part was opened twice, so its prefetches prime a file nothing reads"
     )
-    for actual, wanted in zip(got, expected):
+    for actual, wanted in zip(got, expected, strict=True):
         assert np.array_equal(actual.vertices, wanted.vertices)
 
 
-def test_the_native_async_methods_are_the_ones_used(many: fabriks.MeshCollection):
+def test_the_native_async_methods_are_the_ones_used(
+    many: fabriks.MeshCollection,
+) -> None:
     """obstore has ``get_range_async``; fabriks must call it rather than thread its sync twin."""
     obstore = pytest.importorskip("obstore")
 

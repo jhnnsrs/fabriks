@@ -17,12 +17,19 @@ import pytest
 import trimesh
 
 import fabriks
-from fabriks.contrib import DEFAULT_RESOLUTION, VoxelFit, fit_of, names_of, read_glb
+from fabriks.contrib import (
+    DEFAULT_RESOLUTION,
+    Imported,
+    VoxelFit,
+    fit_of,
+    names_of,
+    read_glb,
+)
 from fabriks.contrib.obj import _split_kwarg
 from fabriks.contrib.scene import assign_ids, baked_geometries, collection_to_scene
 
 
-def two_objects(scale=1.0, centre=True):
+def two_objects(scale: float = 1.0, centre: bool = True) -> trimesh.Scene:
     """A two-object scene, named one way that is an id and one way that is not."""
     scene = trimesh.Scene()
     sphere = trimesh.creation.icosphere(radius=0.6 * scale, subdivisions=2)
@@ -38,7 +45,7 @@ def two_objects(scale=1.0, centre=True):
     return scene
 
 
-def dense_objects():
+def dense_objects() -> trimesh.Scene:
     """The same two objects with enough triangles to fill a real octree."""
     scene = trimesh.Scene()
     scene.add_geometry(
@@ -52,7 +59,9 @@ def dense_objects():
     return scene
 
 
-def imported(scene, **options: object):
+def imported(
+    scene: trimesh.Scene, **options: object
+) -> tuple[Imported, fabriks.Collection]:
     """Read a scene through GLB into a memory store, and open what came out."""
     store = fabriks.MemoryStore()
     result = read_glb(
@@ -67,7 +76,7 @@ def imported(scene, **options: object):
 # -- the fit ------------------------------------------------------------------------ #
 
 
-def test_a_model_centred_on_the_origin_is_fitted_rather_than_refused():
+def test_a_model_centred_on_the_origin_is_fitted_rather_than_refused() -> None:
     """Most mesh files are centred on the origin, and the builder refuses negative cells.
 
     Without the fit this is not a wrong answer but a hard failure -- `build_collection` raises
@@ -83,7 +92,7 @@ def test_a_model_centred_on_the_origin_is_fitted_rather_than_refused():
     )
 
 
-def test_a_unit_scale_model_is_given_enough_voxels_to_partition():
+def test_a_unit_scale_model_is_given_enough_voxels_to_partition() -> None:
     """`cell_size` is whole voxels, so a model one unit across has no cell smaller than itself.
 
     The fit is what buys the resolution to partition at all: fitted, a 0.002-unit model spans
@@ -109,7 +118,7 @@ def test_a_unit_scale_model_is_given_enough_voxels_to_partition():
     )
 
 
-def test_a_unit_scale_model_read_without_the_fit_is_refused():
+def test_a_unit_scale_model_read_without_the_fit_is_refused() -> None:
     """The counterpart: this is what `read_*` would do for every centred file without the fit.
 
     Not a subtly wrong octree but a hard failure, which is why fitting is the default rather
@@ -119,7 +128,7 @@ def test_a_unit_scale_model_read_without_the_fit_is_refused():
         imported(two_objects(scale=0.002), fit=VoxelFit.identity(), levels=3)
 
 
-def test_the_fit_undoes_itself():
+def test_the_fit_undoes_itself() -> None:
     """`apply` and `invert` are one transform read in two directions, and must agree."""
     fit = VoxelFit.for_bounds([-3.0, -1.0, 0.5], [1.0, 2.0, 4.5])
     points = np.array([[-3.0, -1.0, 0.5], [0.0, 0.0, 1.0], [1.0, 2.0, 4.5]])
@@ -132,7 +141,7 @@ def test_the_fit_undoes_itself():
     )
 
 
-def test_the_longest_side_sets_the_scale_for_every_component():
+def test_the_longest_side_sets_the_scale_for_every_component() -> None:
     """A per-component fit would stretch a model to fill its box and distort every render of it."""
     fit = VoxelFit.for_bounds(
         [0.0, 0.0, 0.0], [4.0, 2.0, 1.0], resolution=DEFAULT_RESOLUTION
@@ -148,12 +157,12 @@ def test_the_longest_side_sets_the_scale_for_every_component():
     )
 
 
-def test_a_model_with_no_extent_does_not_divide_by_zero():
+def test_a_model_with_no_extent_does_not_divide_by_zero() -> None:
     """A flat or empty bound has no meaningful scale, and identity beats a ZeroDivisionError."""
     assert VoxelFit.for_bounds([1.0, 1.0, 1.0], [1.0, 1.0, 1.0]).is_identity
 
 
-def test_an_identity_fit_leaves_a_model_where_it_was():
+def test_an_identity_fit_leaves_a_model_where_it_was() -> None:
     """A caller whose model is already in voxel coordinates must be able to say so."""
     scene = two_objects(scale=200.0, centre=False)
 
@@ -167,7 +176,7 @@ def test_an_identity_fit_leaves_a_model_where_it_was():
     )
 
 
-def test_a_model_sized_into_a_single_level_says_so():
+def test_a_model_sized_into_a_single_level_says_so() -> None:
     """A one-level collection is valid and carries no level of detail, which is the whole point.
 
     `plan_grid` budgets by bytes, so a small model legitimately comes back with no pyramid --
@@ -183,8 +192,8 @@ def test_a_model_sized_into_a_single_level_says_so():
     [({}, 1), ({"cell_size": (128, 128, 128)}, 1), ({"levels": 3}, 3)],
 )
 def test_the_grid_is_filled_in_only_where_the_caller_left_it_open(
-    options, expected_levels
-):
+    options: dict[str, object], expected_levels: int
+) -> None:
     """`cell_size` and `levels` are independent: giving one must not discard the other.
 
     Both come from `plan_grid` when neither is given, and either one alone has to survive while
@@ -201,7 +210,7 @@ def test_the_grid_is_filled_in_only_where_the_caller_left_it_open(
 # -- the scene graph ---------------------------------------------------------------- #
 
 
-def test_node_transforms_are_baked_rather_than_dropped():
+def test_node_transforms_are_baked_rather_than_dropped() -> None:
     """`scene.geometry` holds the mesh a node points at, not where the node puts it.
 
     Reading it directly gives every object the right vertex count at the wrong place, stacked on
@@ -221,7 +230,7 @@ def test_node_transforms_are_baked_rather_than_dropped():
     )
 
 
-def test_an_object_that_is_only_a_mesh_still_reads():
+def test_an_object_that_is_only_a_mesh_still_reads() -> None:
     """A format with no scene -- STL, PLY -- loads as one mesh, and must not need a second path."""
     store = fabriks.MemoryStore()
     mesh = trimesh.creation.icosphere(radius=1.0, subdivisions=2)
@@ -240,7 +249,7 @@ def test_an_object_that_is_only_a_mesh_still_reads():
 # -- identity ----------------------------------------------------------------------- #
 
 
-def test_an_integer_looking_name_keeps_its_number():
+def test_an_integer_looking_name_keeps_its_number() -> None:
     """This is the whole reason a collection survives a trip out to a file and back.
 
     Written out, an object's id becomes its name; read back, that name has to become the id
@@ -249,7 +258,7 @@ def test_an_integer_looking_name_keeps_its_number():
     assert assign_ids(["7", "3"]) == {"7": 7, "3": 3}
 
 
-def test_a_number_is_reserved_even_when_a_word_is_seen_first():
+def test_a_number_is_reserved_even_when_a_word_is_seen_first() -> None:
     """The integer names are collected before anything is assigned, and that order matters.
 
     Assign as you go and `"head"` takes 0 before `"0"` is ever reached, so an object comes back
@@ -259,7 +268,7 @@ def test_a_number_is_reserved_even_when_a_word_is_seen_first():
     assert assign_ids(["head", "torso", "0"]) == {"head": 1, "torso": 2, "0": 0}
 
 
-def test_a_name_that_is_not_a_number_gets_the_lowest_free_id():
+def test_a_name_that_is_not_a_number_gets_the_lowest_free_id() -> None:
     """Ids have to come from somewhere, and they must not collide with the ones being kept."""
     assigned = assign_ids(["head", "7", "torso"])
 
@@ -269,7 +278,7 @@ def test_a_name_that_is_not_a_number_gets_the_lowest_free_id():
     )
 
 
-def test_the_names_ride_on_the_object_catalog():
+def test_the_names_ride_on_the_object_catalog() -> None:
     """The names have to survive the write, or an export can only number its objects."""
     result, collection = imported(two_objects())
 
@@ -282,7 +291,9 @@ def test_the_names_ride_on_the_object_catalog():
     assert collection.objects[7].name == "7", "ObjectEntry should carry the name too"
 
 
-def test_a_collection_written_without_the_column_still_reads(opened):
+def test_a_collection_written_without_the_column_still_reads(
+    opened: fabriks.Collection,
+) -> None:
     """The column is optional, and every collection written before it exists lacks it.
 
     Reading one has to give None rather than raise -- this is the back-compatibility gate on the
@@ -299,7 +310,7 @@ def test_a_collection_written_without_the_column_still_reads(opened):
     )
 
 
-def test_the_fit_travels_with_the_collection():
+def test_the_fit_travels_with_the_collection() -> None:
     """An export inverts the import's own numbers, so they have to be in the collection."""
     result, collection = imported(two_objects())
 
@@ -311,7 +322,7 @@ def test_the_fit_travels_with_the_collection():
 # -- export selection --------------------------------------------------------------- #
 
 
-def test_an_export_can_be_narrowed_to_the_objects_that_matter():
+def test_an_export_can_be_narrowed_to_the_objects_that_matter() -> None:
     """A caller extracting one object should not pay for reassembling the rest."""
     _, collection = imported(two_objects())
 
@@ -322,7 +333,9 @@ def test_an_export_can_be_narrowed_to_the_objects_that_matter():
     )
 
 
-def test_an_object_missing_from_a_coarse_level_is_reported_rather_than_dropped(opened):
+def test_an_object_missing_from_a_coarse_level_is_reported_rather_than_dropped(
+    opened: fabriks.Collection,
+) -> None:
     """A short export that says nothing is the failure worth avoiding here.
 
     `Collection.object_mesh` raises for an object a coarse level decimated away entirely, and the
@@ -336,7 +349,7 @@ def test_an_object_missing_from_a_coarse_level_is_reported_rather_than_dropped(o
     )
 
 
-def test_an_export_with_nothing_in_it_is_refused(opened):
+def test_an_export_with_nothing_in_it_is_refused(opened: fabriks.Collection) -> None:
     """Handing back an empty file is worse than saying there was nothing to put in one."""
     with (
         pytest.raises(fabriks.FormatError, match="Nothing was exported"),
@@ -348,7 +361,7 @@ def test_an_export_with_nothing_in_it_is_refused(opened):
 # -- the trimesh version probe ------------------------------------------------------- #
 
 
-def test_the_obj_loader_takes_the_kwarg_this_package_splits_objects_with():
+def test_the_obj_loader_takes_the_kwarg_this_package_splits_objects_with() -> None:
     """The kwarg is `split_objects` in trimesh 5 and `split_object` in 4, and fabriks allows both.
 
     A probe nothing exercises is a branch that rots: if trimesh renames it again, loading an OBJ
@@ -362,7 +375,7 @@ def test_the_obj_loader_takes_the_kwarg_this_package_splits_objects_with():
 # -- the collection is still a collection --------------------------------------------- #
 
 
-def test_a_collection_written_by_contrib_verifies():
+def test_a_collection_written_by_contrib_verifies() -> None:
     """The extra columns must not make the collection anything but an ordinary one.
 
     Read at a grid that gives the octree something to do -- 30 cells across three levels -- so

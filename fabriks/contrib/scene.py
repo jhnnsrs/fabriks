@@ -124,7 +124,7 @@ class Imported:
 # -- reading ----------------------------------------------------------------------- #
 
 
-def load_scene(source: Source, file_type: str, **kwargs: Any) -> trimesh.Scene:  # noqa: ANN401 - loader kwargs differ per format
+def load_scene(source: Source, file_type: str, **kwargs: Any) -> trimesh.Scene:
     """Load a file of a known type as a scene, whatever the caller handed over.
 
     A path is passed to trimesh as a path on purpose: that is what lets its resolver find the

@@ -64,7 +64,7 @@ def a_cut_sheet() -> tuple[np.ndarray, np.ndarray]:
 
 
 @pytest.mark.parametrize("name", BACKENDS)
-def test_a_backend_reduces_toward_the_target(name: str):
+def test_a_backend_reduces_toward_the_target(name: str) -> None:
     """The one thing a face budget asks for."""
     vertices, faces = a_sphere()
     result = backend(name).simplify(
@@ -80,7 +80,7 @@ def test_a_backend_reduces_toward_the_target(name: str):
 
 
 @pytest.mark.parametrize("name", BACKENDS)
-def test_a_backend_leaves_a_mesh_already_under_target_alone(name: str):
+def test_a_backend_leaves_a_mesh_already_under_target_alone(name: str) -> None:
     """No work to do, and no error to report for not doing it."""
     vertices, faces = a_sphere(subdivisions=1)
     result = backend(name).simplify(
@@ -96,7 +96,7 @@ def test_a_backend_leaves_a_mesh_already_under_target_alone(name: str):
 
 
 @pytest.mark.parametrize("name", BACKENDS)
-def test_a_backend_produces_faces_that_index_its_own_vertices(name: str):
+def test_a_backend_produces_faces_that_index_its_own_vertices(name: str) -> None:
     """A remap mistake here is geometry that decodes to nonsense rather than an exception."""
     vertices, faces = a_sphere()
     result = backend(name).simplify(
@@ -117,7 +117,7 @@ def test_a_backend_produces_faces_that_index_its_own_vertices(name: str):
 
 
 @pytest.mark.parametrize("name", BACKENDS)
-def test_a_backend_keeps_the_boundary_where_it_was(name: str):
+def test_a_backend_keeps_the_boundary_where_it_was(name: str) -> None:
     """``LOCKED`` is the promise nothing downstream can check, so it is checked here.
 
     The cut curve is what the neighbouring cell continues across. Every vertex on it must still
@@ -146,7 +146,7 @@ def test_a_backend_keeps_the_boundary_where_it_was(name: str):
 # --------------------------------------------------------------------------- #
 
 
-def test_the_quadric_backend_pins_the_boundary_and_frees_the_interior():
+def test_the_quadric_backend_pins_the_boundary_and_frees_the_interior() -> None:
     """The split that makes this the right algorithm for the format.
 
     A neighbouring cell shares exactly one thing with this one: the cut curve. So that curve
@@ -179,7 +179,7 @@ def test_the_quadric_backend_pins_the_boundary_and_frees_the_interior():
     )
 
 
-def test_the_quadric_backend_reports_a_tighter_error_than_the_fallback():
+def test_the_quadric_backend_reports_a_tighter_error_than_the_fallback() -> None:
     """The reason `error_budget` becomes usable at the scale its name implies.
 
     Held to the same target on the same mesh -- the only comparison that controls for how much
@@ -203,7 +203,7 @@ def test_the_quadric_backend_reports_a_tighter_error_than_the_fallback():
     )
 
 
-def test_the_deviation_measure_is_an_upper_bound_and_grows_with_reduction():
+def test_the_deviation_measure_is_an_upper_bound_and_grows_with_reduction() -> None:
     """It decides whether a viewer fetches more detail, so it must over-report, never under."""
     vertices, faces = a_sphere(subdivisions=4)
     fixed = np.zeros(len(vertices), dtype=bool)
@@ -221,7 +221,9 @@ def test_the_deviation_measure_is_an_upper_bound_and_grows_with_reduction():
     assert all(error > 0.0 for error in errors)
 
 
-def test_the_meshopt_backend_keeps_every_survivor_where_it_was_and_reaches_past_the_border():
+def test_the_meshopt_backend_keeps_every_survivor_where_it_was_and_reaches_past_the_border() -> (
+    None
+):
     """What the lock buys: exactly the mask is held, and nothing is ever repositioned.
 
     The cut boundary of this sheet is left *unlocked*, so the budget is not held hostage by it --
@@ -248,7 +250,7 @@ def test_the_meshopt_backend_keeps_every_survivor_where_it_was_and_reaches_past_
     )
 
 
-def test_measuring_deviation_against_an_unchanged_mesh_is_zero():
+def test_measuring_deviation_against_an_unchanged_mesh_is_zero() -> None:
     """The identity case, since the bound is what a budget is spent against."""
     vertices, _ = a_sphere(subdivisions=1)
 
@@ -256,7 +258,7 @@ def test_measuring_deviation_against_an_unchanged_mesh_is_zero():
     assert measure_deviation(vertices, vertices[:0]) == 0.0
 
 
-def test_the_quadric_backend_falls_back_when_the_boundary_did_not_hold():
+def test_the_quadric_backend_falls_back_when_the_boundary_did_not_hold() -> None:
     """The verification is what turns a library flag into a guarantee.
 
     Forced here by refusing every result: a backend that cannot satisfy the boundary check must
@@ -285,7 +287,7 @@ def test_the_quadric_backend_falls_back_when_the_boundary_did_not_hold():
     )
 
 
-def test_the_boundary_check_notices_a_boundary_that_did_not_hold():
+def test_the_boundary_check_notices_a_boundary_that_did_not_hold() -> None:
     """Directly, rather than only through a backend that is supposed to avoid it.
 
     Note what the check actually asks: *is some surviving vertex at exactly this position*. A
@@ -317,7 +319,7 @@ def test_the_boundary_check_notices_a_boundary_that_did_not_hold():
 # --------------------------------------------------------------------------- #
 
 
-def test_a_name_selects_a_backend_and_the_default_is_the_meshopt_one():
+def test_a_name_selects_a_backend_and_the_default_is_the_meshopt_one() -> None:
     """`simplification` is a value out of a vocabulary, the way `codec` is."""
     assert isinstance(
         simplifier_for(fabriks.SIMPLIFICATION_MESHOPT), fabriks.MeshoptSimplifier
@@ -338,7 +340,7 @@ def test_a_name_selects_a_backend_and_the_default_is_the_meshopt_one():
     )
 
 
-def test_a_backend_this_package_does_not_ship_is_refused_by_name():
+def test_a_backend_this_package_does_not_ship_is_refused_by_name() -> None:
     """Naming what exists beats an AttributeError inside the build."""
     with pytest.raises(fabriks.FormatError, match="`simplification` is"):
         simplifier_for("MESHLAB")
@@ -356,7 +358,7 @@ def test_a_backend_this_package_does_not_ship_is_refused_by_name():
 @pytest.mark.parametrize("name", BACKENDS)
 def test_a_target_that_destroys_the_surface_is_relaxed_until_something_survives(
     name: str,
-):
+) -> None:
     """A level is a standalone representation, so a piece may never be simplified to nothing."""
     box = trimesh.creation.box(extents=[10.0, 10.0, 10.0])
     vertices = np.asarray(box.vertices, dtype=np.float64)
@@ -382,7 +384,7 @@ def test_a_target_that_destroys_the_surface_is_relaxed_until_something_survives(
 @pytest.mark.parametrize("name", BACKENDS)
 def test_a_collection_built_with_either_backend_holds_the_same_invariants(
     name: str, objects: dict
-):
+) -> None:
     """Both backends have to satisfy everything the format promises, not just the default one."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -418,7 +420,7 @@ def test_a_collection_built_with_either_backend_holds_the_same_invariants(
             assert entry.lod_error >= opened.cells[key].lod_error - 1e-12
 
 
-def test_the_backend_choice_does_not_change_the_partition(objects: dict):
+def test_the_backend_choice_does_not_change_the_partition(objects: dict) -> None:
     """Which simplifier runs is a quality decision, never a structural one.
 
     The cells, and which objects live in them, come out of the clipping and the octree -- so
@@ -447,7 +449,9 @@ def test_the_backend_choice_does_not_change_the_partition(objects: dict):
         ), f"level {level} was partitioned differently"
 
 
-def test_the_manifest_declares_the_reduction_that_was_actually_applied(objects: dict):
+def test_the_manifest_declares_the_reduction_that_was_actually_applied(
+    objects: dict,
+) -> None:
     """`decimation` is a claim about the geometry that nothing downstream can re-derive."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -472,7 +476,7 @@ def test_the_manifest_declares_the_reduction_that_was_actually_applied(objects: 
     )
 
 
-def test_a_ratio_and_its_declaration_are_required_to_agree():
+def test_a_ratio_and_its_declaration_are_required_to_agree() -> None:
     """A writer cannot declare QUARTER while reducing by half; nothing downstream could catch it."""
     with pytest.raises(fabriks.FormatError, match="is HALF, not QUARTER"):
         fabriks.Decimation(ratio=0.5)
@@ -485,7 +489,7 @@ def test_a_ratio_and_its_declaration_are_required_to_agree():
         fabriks.Decimation(ratio=0.25, floor_faces=2)
 
 
-def test_the_face_floor_is_configurable():
+def test_the_face_floor_is_configurable() -> None:
     """A collection of small objects can ask for more of them to survive the coarse levels."""
     schedule = fabriks.Decimation.quarter(floor_faces=32)
 

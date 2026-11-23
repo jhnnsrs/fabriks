@@ -19,7 +19,7 @@ import fabriks
 from fabriks.frames import blob_sizes
 
 
-def plan_quietly(objects: dict[int, Any], **kwargs: Any) -> fabriks.GridPlan:  # noqa: ANN401
+def plan_quietly(objects: dict[int, Any], **kwargs: Any) -> fabriks.GridPlan:
     """A plan without the advisory warnings, for tests not asserting on them."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -79,7 +79,7 @@ def scattered() -> dict[int, Any]:
     return objects
 
 
-def test_a_plan_is_built_from_without_being_touched_up(objects):
+def test_a_plan_is_built_from_without_being_touched_up(objects: dict[int, Any]) -> None:
     """The plan's whole claim is that its output goes straight into a build.
 
     Not trivially true: `cell_size` has to be three whole positive numbers and `levels` at least
@@ -95,7 +95,7 @@ def test_a_plan_is_built_from_without_being_touched_up(objects):
     assert len(collection.shards) == plan.levels, "every level from 0 gets a shard"
 
 
-def test_the_cell_is_a_power_of_two_on_every_component(objects):
+def test_the_cell_is_a_power_of_two_on_every_component(objects: dict[int, Any]) -> None:
     """Coarser cells have to be exactly two finer ones, or the LOCKED boundary argument fails.
 
     A level-0 plane is only a superset of every coarser level's plane set when the cell doubles
@@ -109,7 +109,9 @@ def test_the_cell_is_a_power_of_two_on_every_component(objects):
             )
 
 
-def test_a_bigger_cell_budget_never_asks_for_a_smaller_cell(objects):
+def test_a_bigger_cell_budget_never_asks_for_a_smaller_cell(
+    objects: dict[int, Any],
+) -> None:
     """Monotonicity is the property that makes the knob a knob.
 
     A planner that picked the *closest* rung rather than the largest one under the budget would
@@ -122,7 +124,9 @@ def test_a_bigger_cell_budget_never_asks_for_a_smaller_cell(objects):
     assert sizes == sorted(sizes), f"cell volume is not monotone in cell_bytes: {sizes}"
 
 
-def test_a_bigger_layer_budget_never_asks_for_more_levels(objects):
+def test_a_bigger_layer_budget_never_asks_for_more_levels(
+    objects: dict[int, Any],
+) -> None:
     """The tree stops once a level fits one retrieval, so a larger retrieval means a shallower tree.
 
     Worth checking rather than assuming: `levels` also floors at one cell and caps at
@@ -138,7 +142,9 @@ def test_a_bigger_layer_budget_never_asks_for_more_levels(objects):
     )
 
 
-def test_a_layer_budget_that_already_holds_everything_gives_one_level(objects):
+def test_a_layer_budget_that_already_holds_everything_gives_one_level(
+    objects: dict[int, Any],
+) -> None:
     """A single level is the right answer, not a degenerate one to be avoided.
 
     When level 0 already fits in one fetch there is nothing a coarser level could save, and
@@ -151,7 +157,9 @@ def test_a_layer_budget_that_already_holds_everything_gives_one_level(objects):
     assert len(plan.layers) == 1
 
 
-def test_a_cell_below_the_object_fit_is_warned_about_and_still_returned(objects):
+def test_a_cell_below_the_object_fit_is_warned_about_and_still_returned(
+    objects: dict[int, Any],
+) -> None:
     """Cutting objects is normal here, so this is advice rather than a refusal.
 
     The format exists to cut objects -- the suite's own fixtures use a cell smaller than their
@@ -173,13 +181,13 @@ def test_a_cell_below_the_object_fit_is_warned_about_and_still_returned(objects)
     assert plan.object_fit == fit, (
         "the plan reports a different fit than choose_cell_size"
     )
-    assert any(a < b for a, b in zip(plan.cell_size, fit)), (
+    assert any(a < b for a, b in zip(plan.cell_size, fit, strict=True)), (
         "nothing was actually below the fit"
     )
     assert plan.levels >= 1
 
 
-def test_a_cell_index_never_passes_the_morton_limit(objects):
+def test_a_cell_index_never_passes_the_morton_limit(objects: dict[int, Any]) -> None:
     """The 17-bit cap is resolved here rather than discovered partway through an expensive build.
 
     Level-0 indices are the largest in the tree, so a small cell on a distant object is what
@@ -199,7 +207,9 @@ def test_a_cell_index_never_passes_the_morton_limit(objects):
     fabriks.morton_encode_one((reach[0], 1, 1))  # raises if the cap is breached
 
 
-def test_an_aspect_anchor_is_scaled_rather_than_replaced(objects):
+def test_an_aspect_anchor_is_scaled_rather_than_replaced(
+    objects: dict[int, Any],
+) -> None:
     """`aspect` exists so a caller can hand over the source array's chunk shape.
 
     That shape is the one thing about the grid no amount of looking at the meshes can reveal, so
@@ -211,7 +221,9 @@ def test_an_aspect_anchor_is_scaled_rather_than_replaced(objects):
     assert (y, z) == (2 * x, 4 * x), f"aspect (1, 2, 4) came back as {plan.cell_size}"
 
 
-def test_an_empty_collection_is_refused_the_way_a_build_refuses_one(objects):
+def test_an_empty_collection_is_refused_the_way_a_build_refuses_one(
+    objects: dict[int, Any],
+) -> None:
     """Same error type and the same moment as `build_collection`, so the two agree.
 
     A planner that returned some default grid for no objects would push the failure into the
@@ -223,8 +235,8 @@ def test_an_empty_collection_is_refused_the_way_a_build_refuses_one(objects):
 
 
 def test_a_plan_deep_on_cells_under_the_object_fit_warns_that_the_build_may_raise(
-    scattered,
-):
+    scattered: dict[int, Any],
+) -> None:
     """The one regime where a plan's own output is known to break `build_collection`.
 
     Decimation places a collapsed vertex at the quadric-optimal position, and for a vertex near
@@ -246,8 +258,8 @@ def test_a_plan_deep_on_cells_under_the_object_fit_warns_that_the_build_may_rais
     ("cell_bytes", "layer_bytes"), [(16 * 1024, 128 * 1024), (32 * 1024, 512 * 1024)]
 )
 def test_a_plan_that_does_not_warn_builds_without_raising(
-    scattered, cell_bytes, layer_bytes
-):
+    scattered: dict[int, Any], cell_bytes: int, layer_bytes: int
+) -> None:
     """The warning above has to be the *only* way into the failure, or it is not worth having.
 
     This is the scene that first exposed the writer bug, so it is the one that has to demonstrate
@@ -266,7 +278,9 @@ def test_a_plan_that_does_not_warn_builds_without_raising(
     )  # raises PartitioningError if the regime was misjudged
 
 
-def test_geometry_in_the_negative_octant_is_refused_rather_than_planned_around(objects):
+def test_geometry_in_the_negative_octant_is_refused_rather_than_planned_around(
+    objects: dict[int, Any],
+) -> None:
     """A plan against a grid the collection could never be written to is worse than no plan.
 
     The octree is anchored at the origin and cell indices are non-negative, so a vertex below it
@@ -283,13 +297,17 @@ def test_geometry_in_the_negative_octant_is_refused_rather_than_planned_around(o
 
 
 @pytest.mark.parametrize("band", [(0.0, 1.0), (2.0, 1.0)])
-def test_a_band_that_is_not_an_ascending_pair_of_factors_is_refused(objects, band):
+def test_a_band_that_is_not_an_ascending_pair_of_factors_is_refused(
+    objects: dict[int, Any], band: tuple[float, float]
+) -> None:
     """Both bands are ordered pairs, and a reversed one would silently inverve every bracket."""
     with pytest.raises(fabriks.FormatError, match="ascending pair"):
         fabriks.plan_grid(objects, coarsening=band)
 
 
-def test_describe_prints_a_row_per_level_and_marks_the_estimates(surface):
+def test_describe_prints_a_row_per_level_and_marks_the_estimates(
+    surface: dict[int, Any],
+) -> None:
     """The table is the deliverable for a human, and the est. marks are the honest part of it.
 
     Level 0 is arithmetic and everything above it is an extrapolation; a table that did not say
@@ -305,7 +323,9 @@ def test_describe_prints_a_row_per_level_and_marks_the_estimates(surface):
 
 
 @pytest.mark.parametrize("cell_bytes", [2 * 1024, 8 * 1024, 32 * 1024])
-def test_level_zero_lands_within_the_tolerance_it_claims(objects, cell_bytes):
+def test_level_zero_lands_within_the_tolerance_it_claims(
+    objects: dict[int, Any], cell_bytes: int
+) -> None:
     """The contract that makes level 0 worth reporting as arithmetic rather than a guess.
 
     Nothing about binning coordinates is guaranteed to match what trimesh's clipper and the
@@ -330,7 +350,9 @@ def test_level_zero_lands_within_the_tolerance_it_claims(objects, cell_bytes):
     )
 
 
-def test_every_level_lands_inside_its_bracket_on_a_single_cut_surface(surface):
+def test_every_level_lands_inside_its_bracket_on_a_single_cut_surface(
+    surface: dict[int, Any],
+) -> None:
     """The bracket has to hold in the regime it was widened for, not just the easy one.
 
     A scene of separate objects and one large cut surface move differently up the levels -- on

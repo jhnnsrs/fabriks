@@ -41,7 +41,7 @@ from fabriks.octree import cell_box
 from fabriks.stores import get_range_bytes, join
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
-    from fabriks.reader import CellEntry, Collection
+    from fabriks.reader import CellEntry, Collection, DecodedCell
 
 #: The tiers, cheapest first. Each includes the ones before it.
 TIERS = ("structure", "blobs", "geometry")
@@ -499,8 +499,8 @@ def _offset_problems(decoded: Any, where: str) -> list[str]:  # noqa: ANN401
 def _box_problems(
     collection: Collection,
     entry: CellEntry,
-    decoded: Any,
-    where: str,  # noqa: ANN401
+    decoded: DecodedCell,
+    where: str,
 ) -> list[str]:
     """Whether a cell's geometry is inside the box its Morton code addresses.
 
@@ -520,8 +520,8 @@ def _box_problems(
 def _identity_problems(
     collection: Collection,
     entry: CellEntry,
-    decoded: Any,
-    where: str,  # noqa: ANN401
+    decoded: DecodedCell,
+    where: str,
 ) -> list[str]:
     """Whether the forward and inverted identity indexes say the same thing.
 
@@ -781,7 +781,7 @@ def _max_surface_distance(
     return float(
         max(
             _point_to_faces(point, corners, row)
-            for point, row in zip(query, candidates)
+            for point, row in zip(query, candidates, strict=True)
         )
     )
 
